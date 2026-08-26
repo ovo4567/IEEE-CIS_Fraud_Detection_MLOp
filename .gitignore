@@ -94,6 +94,9 @@ target/
 # MLflow
 mlruns/
 
+# CatBoost training artifacts
+notebooks/catboost_info/
+
 # IPython
 profile_default/
 ipython_config.py
