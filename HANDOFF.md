@@ -1,8 +1,8 @@
 # HANDOFF — IEEE-CIS Fraud Detection
 
-- **Last session:** 2026-08-27 (same day, new session) — **Docs + HANDOFF polish (ticket 11) done**
-- **Next session:** 2026-08-27 — push to GitHub to see CI/CD run; then v2 ideas (identity features, time features, calibration)
-- **Git:** ticket 11 committed (portfolio-grade README + portfolio notes + MkDocs nav); see "This session" below
+- **Last session:** 2026-08-27 (same day, new session) — **CI/CD verified end-to-end on GitHub (first push)**
+- **Next session:** 2026-08-27 — v2 ideas (identity features, time features, calibration)
+- **Git:** pushed to `origin/main`; first CI/CD run green (run 33080345424, image pushed to GHCR); see "This session" below
 
 ---
 
@@ -199,8 +199,13 @@ a fresh clone:
   score. Pure `check_seed_contract(boundary)` + thin typer CLI (deployment
   package `python -m` convention).
 - Verified locally: `uv run make lint` green, `make contract` OK (218/9/0.0551),
-  `make test` 151 passed, compose config valid, workflow YAMLs parse. GHCR push
-  itself needs the first push to `main` (can't run from here without auth).
+  `make test` 151 passed, compose config valid, workflow YAMLs parse.
+- **Verified end-to-end on GitHub (2026-08-27, first push `5bccbf0..3a42b21`):**
+  run **33080345424** green — `ci` (lint + contract + tests) in 3m50s, then `cd`
+  built + pushed `ghcr.io/ovo4567/ieee-fraud-serving` (`sha-3a42b21` + `latest`,
+  digest sha256:f04badc2…) in 5m50s. Only annotation: Node.js 20 deprecation
+  warnings on `checkout@v4` / `setup-python@v5` / `setup-uv@v5` (forced onto
+  Node 24) — bump actions in a future cleanup, not blocking.
 
 ## ✅ This session — docs + handoff polish (ticket 11)
 
@@ -224,8 +229,8 @@ documentation is now real:
 
 ## Plan for next session
 
-1. **Push to GitHub** and confirm CI is green on the first commit and CD pushes
-   the image to GHCR (the two things that can't be exercised locally).
+1. ~~Push to GitHub and confirm CI/CD~~ — **done** (2026-08-27, see the ticket
+   10 note above).
 2. Later (v2): identity feature engineering, time features, aggregations,
    calibration, neural net.
 

@@ -84,3 +84,23 @@ it directly (`make contract`) and it doubles as an on-demand local check.
   `if`) so a failing commit can never publish; the contract gate now also
   asserts the feature contract's ``category`` dtype promise through the shared
   transform (spec.md); CI runs on *every* push (spec story 17), not just main.
+
+### Verified end-to-end on GitHub (2026-08-27)
+
+The first push (`5bccbf0..3a42b21`) triggered run **33080345424**, both jobs
+green:
+
+- **`ci`** (lint + contract + tests) completed in **3m50s** — `uv sync
+  --frozen` → `make lint` → `make contract` (`Feature contract OK: 218
+  features, 9 categoricals, threshold=0.0551`) → `make test` (151 passed) →
+  compose validation. This confirmed the **CI cold start** works on fresh
+  GitHub runners with no caches.
+- **`cd`** (build + push serving image) completed in **5m50s** — Buildx build
+  of `deploy/Dockerfile` from the repo root, GHCR login via `GITHUB_TOKEN`,
+  and push of `ghcr.io/ovo4567/ieee-fraud-serving` tagged `sha-3a42b21` +
+  `latest` (digest `sha256:f04badc2…`, `pushed_at` set in the logs).
+
+Both previously-untestable unknowns are now verified. Only annotation on the
+run: **Node.js 20 deprecation** warnings on `actions/checkout@v4`,
+`actions/setup-python@v5`, `astral-sh/setup-uv@v5` (forced onto Node 24) —
+non-blocking; bump those actions in a future cleanup.
