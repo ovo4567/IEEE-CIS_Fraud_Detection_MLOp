@@ -1,7 +1,7 @@
 from pathlib import Path
 
-import pandas as pd
 from loguru import logger
+import pandas as pd
 import typer
 
 from ieee_cis_fraud_detection.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
@@ -18,9 +18,7 @@ TRANSACTION_CATEGORICAL_COLS = (
     + [f"M{i}" for i in range(1, 10)]
 )
 
-IDENTITY_CATEGORICAL_COLS = (
-    ["DeviceType", "DeviceInfo"] + [f"id_{i:02d}" for i in range(12, 39)]
-)
+IDENTITY_CATEGORICAL_COLS = ["DeviceType", "DeviceInfo"] + [f"id_{i:02d}" for i in range(12, 39)]
 
 # Drop columns whose missing-value percentage exceeds this threshold.
 MISSING_PERCENT_THRESHOLD = 50.0
@@ -62,9 +60,7 @@ def filter_columns_by_missingness(
     cols_to_keep = null_percent[null_percent <= threshold].index
     dropped = df.columns.difference(cols_to_keep).tolist()
     if dropped:
-        logger.info(
-            f"Dropped {len(dropped)} columns with > {threshold}% missing values"
-        )
+        logger.info(f"Dropped {len(dropped)} columns with > {threshold}% missing values")
     return df[cols_to_keep]
 
 
@@ -106,12 +102,10 @@ def build_train_features() -> tuple[pd.DataFrame, pd.DataFrame]:
     identity = convert_categoricals(identity, IDENTITY_CATEGORICAL_COLS)
 
     logger.info(
-        f"train_transaction: {transaction.shape} "
-        f"({transaction.memory_usage().sum() / 1e6:.1f} MB)"
+        f"train_transaction: {transaction.shape} ({transaction.memory_usage().sum() / 1e6:.1f} MB)"
     )
     logger.info(
-        f"train_identity:   {identity.shape} "
-        f"({identity.memory_usage().sum() / 1e6:.1f} MB)"
+        f"train_identity:   {identity.shape} ({identity.memory_usage().sum() / 1e6:.1f} MB)"
     )
     return transaction, identity
 
