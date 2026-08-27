@@ -21,6 +21,34 @@ MODELS_DIR = PROJ_ROOT / "models"
 REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 
+# --------------------------------------------------------------------------- #
+# MLflow registries
+# --------------------------------------------------------------------------- #
+
+# --------------------------------------------------------------------------- #
+# MLflow registries
+# --------------------------------------------------------------------------- #
+
+MLRUNS_DIR = PROJ_ROOT / "mlruns"
+SEED_REGISTRY_DIR = MODELS_DIR / "seed"
+SEED_MODEL_PATH = SEED_REGISTRY_DIR / "champion_model"
+
+
+def tracking_uri_for(db_dir: Path) -> str:
+    """Local SQLite MLflow tracking URI for a registry directory."""
+    return f"sqlite:///{db_dir / 'mlflow.db'}"
+
+
+# Legacy notebook store (read-only). It holds the `finetuned_lgbm` recipe the
+# seed pipeline re-fits; its artifacts are split-brain archaeology and are
+# never reused (see .scratch/mlops-deployment/spec.md).
+LEGACY_TRACKING_URI = tracking_uri_for(MLRUNS_DIR)
+
+# Clean deployment registry (ticket 02): the committed seed store, distinct
+# from the legacy notebook store. The seed pyfunc is saved to SEED_MODEL_PATH
+# so `make demo` can serve it offline on a fresh clone.
+SEED_TRACKING_URI = tracking_uri_for(SEED_REGISTRY_DIR)
+
 # If tqdm is installed, configure loguru with tqdm.write
 # https://github.com/Delgan/loguru/issues/135
 try:

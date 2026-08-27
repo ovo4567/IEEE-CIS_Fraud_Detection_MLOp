@@ -68,6 +68,12 @@ data: requirements
 	$(PYTHON_INTERPRETER) ieee_cis_fraud_detection/dataset.py
 
 
+## Seed the committed champion model (re-fit finetuned_lgbm on the 70/15/15 split, register champion v1)
+.PHONY: seed
+seed:
+	$(PYTHON_INTERPRETER) -m ieee_cis_fraud_detection.modeling.train
+
+
 #################################################################################
 # Self Documenting Commands                                                     #
 #################################################################################
