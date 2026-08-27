@@ -33,6 +33,17 @@ MLRUNS_DIR = PROJ_ROOT / "mlruns"
 SEED_REGISTRY_DIR = MODELS_DIR / "seed"
 SEED_MODEL_PATH = SEED_REGISTRY_DIR / "champion_model"
 
+# --------------------------------------------------------------------------- #
+# Monitoring (drift current-window store)
+# --------------------------------------------------------------------------- #
+
+# Every batch-scored transaction accumulates here (TransactionID, score,
+# decision); ticket 08's drift monitor time-slices this store into the "current"
+# window and compares it to the training reference. Lives under data/ (DVC-
+# tracked, gitignored) because it is runtime data, not a committed artifact.
+MONITORING_DIR = DATA_DIR / "monitoring"
+DRIFT_STORE_PATH = MONITORING_DIR / "current_window.csv"
+
 
 def tracking_uri_for(db_dir: Path) -> str:
     """Local SQLite MLflow tracking URI for a registry directory."""

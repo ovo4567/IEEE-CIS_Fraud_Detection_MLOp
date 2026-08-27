@@ -64,6 +64,10 @@ _Avoid_: stream, live data, online data
 The (reference, current) pair compared by monitoring — the training distribution vs the scored production-stream distribution.
 _Avoid_: drift
 
+**Drift current-window store**:
+The append-only log every batch-scored transaction lands in (`data/monitoring/current_window.csv`), the honest data source monitoring time-slices into the "current" half of the drift window.
+_Avoid_: score log, monitoring store
+
 **Label reveal**:
 The point at which a scored production transaction's true outcome becomes known and it may join the retraining corpus.
 _Avoid_: labeling, ground-truth arrival

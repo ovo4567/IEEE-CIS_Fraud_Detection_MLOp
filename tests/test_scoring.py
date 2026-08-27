@@ -20,44 +20,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ieee_cis_fraud_detection.serving.scoring import (
-    ContractError,
-    ModelContract,
-    ScoringBoundary,
-    load_model,
-)
+from conftest import CATEGORICAL_COLUMNS, THRESHOLD, make_boundary, make_frame
+from ieee_cis_fraud_detection.serving.scoring import ContractError, ScoringBoundary, load_model
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
-
-FEATURE_COLUMNS = ("TransactionDT", "amount", "cat_a", "cat_b")
-CATEGORICAL_COLUMNS = ("cat_a", "cat_b")
-THRESHOLD = 0.5
-
-
-def make_contract() -> ModelContract:
-    return ModelContract(
-        feature_columns=FEATURE_COLUMNS,
-        categorical_columns=CATEGORICAL_COLUMNS,
-        threshold=THRESHOLD,
-    )
-
-
-def make_frame(n: int = 2) -> pd.DataFrame:
-    """A valid frame under the tiny contract (categoricals as plain strings)."""
-    return pd.DataFrame(
-        {
-            "TransactionDT": [100 + i for i in range(n)],
-            "amount": [10.0 + i for i in range(n)],
-            "cat_a": [("W", "H", "C")[i % 3] for i in range(n)],
-            "cat_b": [("a", "b", "c")[i % 3] for i in range(n)],
-        }
-    )
-
-
-def make_boundary(score_fn=None) -> ScoringBoundary:
-    if score_fn is None:
-        score_fn = lambda frame: pd.Series(0.1, index=frame.index)
-    return ScoringBoundary(score_fn=score_fn, contract=make_contract())
 
 
 # --------------------------------------------------------------------------- #

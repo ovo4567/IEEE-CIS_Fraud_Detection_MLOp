@@ -20,28 +20,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from conftest import make_boundary
 from ieee_cis_fraud_detection.serving.api import create_app
-from ieee_cis_fraud_detection.serving.scoring import ModelContract, ScoringBoundary, load_model
+from ieee_cis_fraud_detection.serving.scoring import load_model
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
-
-FEATURE_COLUMNS = ("TransactionDT", "amount", "cat_a", "cat_b")
-CATEGORICAL_COLUMNS = ("cat_a", "cat_b")
-THRESHOLD = 0.5
-
-
-def make_boundary(score_fn=None) -> ScoringBoundary:
-    """A hermetic boundary under the tiny contract, so no model is loaded."""
-    if score_fn is None:
-        score_fn = lambda frame: pd.Series(0.42, index=frame.index)
-    return ScoringBoundary(
-        score_fn=score_fn,
-        contract=ModelContract(
-            feature_columns=FEATURE_COLUMNS,
-            categorical_columns=CATEGORICAL_COLUMNS,
-            threshold=THRESHOLD,
-        ),
-    )
 
 
 def make_payload(**overrides: object) -> dict[str, object]:
