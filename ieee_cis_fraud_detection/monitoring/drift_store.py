@@ -42,3 +42,16 @@ def append_scores(scored: pd.DataFrame, store_path: Path) -> int:
     store_path.parent.mkdir(parents=True, exist_ok=True)
     rows.to_csv(store_path, mode="a", header=not store_path.exists(), index=False)
     return len(rows)
+
+
+def scored_ids(store: pd.DataFrame, *, id_column: str = "TransactionID") -> set[int]:
+    """The set of ``TransactionID``s present in a store frame (empty if none).
+
+    The honest record of what has actually been scored, shared by the
+    retraining corpus assembly and the monitoring flow so both read the same
+    set of scored transactions.
+    """
+    if len(store) == 0 or id_column not in store.columns:
+        return set()
+    ids = pd.to_numeric(store[id_column], errors="coerce")
+    return {int(x) for x in ids.dropna().unique()}

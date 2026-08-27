@@ -80,6 +80,18 @@ retrain:
 	$(PYTHON_INTERPRETER) -m ieee_cis_fraud_detection.orchestration.retraining
 
 
+## Replay the production stream through the real-time API (live demo)
+.PHONY: simulate
+simulate:
+	$(PYTHON_INTERPRETER) -m ieee_cis_fraud_detection.orchestration.monitoring simulate
+
+
+## Run one scheduled drift-monitoring pass (batch-score chunk -> store -> Evidently report -> alarm)
+.PHONY: monitor
+monitor:
+	$(PYTHON_INTERPRETER) -m ieee_cis_fraud_detection.orchestration.monitoring monitor
+
+
 #################################################################################
 # Self Documenting Commands                                                     #
 #################################################################################

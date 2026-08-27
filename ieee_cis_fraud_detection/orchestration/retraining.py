@@ -58,7 +58,7 @@ from ieee_cis_fraud_detection.modeling.threshold import (
     operating_threshold,
 )
 from ieee_cis_fraud_detection.modeling.train import prepare_data, resolve_finetuned_params
-from ieee_cis_fraud_detection.monitoring.drift_store import read_store
+from ieee_cis_fraud_detection.monitoring.drift_store import read_store, scored_ids
 from ieee_cis_fraud_detection.orchestration.control_plane import (
     DEFAULT_ALPHA,
     DEFAULT_REVEAL_LAG,
@@ -189,11 +189,7 @@ def scored_transaction_ids(store_path: Path) -> set[int]:
     folds in exactly the production transactions that entered the serving
     stack — never stream rows that were never scored.
     """
-    store = read_store(store_path)
-    if "TransactionID" not in store.columns or len(store) == 0:
-        return set()
-    ids = pd.to_numeric(store["TransactionID"], errors="coerce")
-    return {int(x) for x in ids.dropna().unique()}
+    return scored_ids(read_store(store_path))
 
 
 def prepare_retraining_inputs(

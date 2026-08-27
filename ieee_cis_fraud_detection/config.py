@@ -34,7 +34,7 @@ SEED_REGISTRY_DIR = MODELS_DIR / "seed"
 SEED_MODEL_PATH = SEED_REGISTRY_DIR / "champion_model"
 
 # --------------------------------------------------------------------------- #
-# Monitoring (drift current-window store)
+# Monitoring (drift current-window store + Evidently reports)
 # --------------------------------------------------------------------------- #
 
 # Every batch-scored transaction accumulates here (TransactionID, score,
@@ -43,6 +43,13 @@ SEED_MODEL_PATH = SEED_REGISTRY_DIR / "champion_model"
 # tracked, gitignored) because it is runtime data, not a committed artifact.
 MONITORING_DIR = DATA_DIR / "monitoring"
 DRIFT_STORE_PATH = MONITORING_DIR / "current_window.csv"
+
+# The Evidently drift report artifacts the monitoring flow writes (ticket 08):
+# the current window vs the training reference, feature + score drift. HTML is
+# the human-readable report; JSON is the machine-readable snapshot.
+DRIFT_REPORTS_DIR = MONITORING_DIR / "reports"
+DRIFT_REPORT_PATH = DRIFT_REPORTS_DIR / "latest_drift_report.html"
+DRIFT_REPORT_JSON_PATH = DRIFT_REPORTS_DIR / "latest_drift_report.json"
 
 # --------------------------------------------------------------------------- #
 # Retraining flow + served model (ticket 07)

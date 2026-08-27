@@ -18,6 +18,7 @@ classifiers = [
 dependencies = [
     "catboost>=1.2.10",
     "dvc>=3.67.1",
+    "evidently>=0.7.21",
     "fastapi",
     "httpx",
     "ipython",
