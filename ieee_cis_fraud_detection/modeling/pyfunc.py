@@ -15,8 +15,29 @@ serving surfaces load this pyfunc and never re-implement training logic.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import mlflow.pyfunc
 import pandas as pd
+
+
+def apply_transform(
+    frame: pd.DataFrame,
+    feature_columns: Sequence[str],
+    categorical_columns: Sequence[str],
+) -> pd.DataFrame:
+    """Coerce input to the exact training representation.
+
+    Selects precisely the training feature columns in training order and casts
+    the categorical columns to the pandas ``category`` dtype, so a booster only
+    ever sees the representation it was fit on. The champion artifact and the
+    scoring boundary (ticket 03) share this one function, so the feature
+    representation has a single owner (ADR-0002).
+    """
+    out = frame.loc[:, list(feature_columns)].copy()
+    for column in categorical_columns:
+        out[column] = out[column].astype("category")
+    return out
 
 
 class ChampionModel(mlflow.pyfunc.PythonModel):
@@ -40,16 +61,8 @@ class ChampionModel(mlflow.pyfunc.PythonModel):
         self.threshold = float(threshold)
 
     def transform(self, model_input: pd.DataFrame) -> pd.DataFrame:
-        """Coerce input to the exact training representation.
-
-        Selects precisely the training feature columns in training order and
-        casts the categorical columns to the pandas ``category`` dtype, so the
-        booster only ever sees the representation it was fit on.
-        """
-        out = model_input.loc[:, self.feature_columns].copy()
-        for column in self.categorical_columns:
-            out[column] = out[column].astype("category")
-        return out
+        """Coerce input to the exact training representation (see :func:`apply_transform`)."""
+        return apply_transform(model_input, self.feature_columns, self.categorical_columns)
 
     def predict(self, context, model_input: pd.DataFrame) -> pd.DataFrame:
         """Return the fraud score (probability) for each input row."""
