@@ -18,7 +18,16 @@ make data               # (optional) regenerate processed features
 make seed               # (only if models/seed is absent — it is committed)
 make test               # run the test suite
 make lint               # ruff check + format check
+make contract           # feature-contract check (verifies the committed seed)
 ```
+
+## CI/CD (GitHub Actions)
+
+Pushing to `main` runs CI (ruff, the feature-contract check, the full test
+suite, and a Compose-manifest validation) and then CD builds the serving image
+and publishes it to GHCR tagged by commit (`ghcr.io/<owner>/ieee-fraud-serving`).
+GHCR is the publish target only — `make demo` builds and runs the same image
+locally with no registry auth (ADR-0001). See `deploy/README.md`.
 
 ## Run the self-contained demo stack (Docker Compose, offline)
 

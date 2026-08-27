@@ -46,6 +46,12 @@ test:
 	python -m pytest tests
 
 
+## Verify the committed seed artifact's feature contract (CI step, ticket 10)
+.PHONY: contract
+contract:
+	python -m ieee_cis_fraud_detection.deployment.contract_check
+
+
 ## Set up Python interpreter environment
 .PHONY: create_environment
 create_environment:

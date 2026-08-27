@@ -47,6 +47,23 @@ schedule). The batch CLI also remains available inside the image
   `data/processed/*.parquet`, exactly as it is for every other `make` target.
   The committed seed (`models/seed`, already in git) means no re-training.
 
+## CI/CD (ticket 10)
+
+GitHub Actions publishes this image as a real artifact pipeline, but GHCR is
+the *publish target, not the runtime* (ADR-0001) — `make demo` always builds
+and runs locally. One workflow (`.github/workflows/ci.yml`) holds both jobs:
+
+- **`ci`** (every push + PR): `uv sync --frozen` → `make lint` → `make contract`
+  (the feature-contract check) → `make test` → `docker compose config --quiet`.
+  Runs on committed inputs only — no DVC pull.
+- **`cd`** (`needs: ci`, default-branch pushes only): builds the same
+  `deploy/Dockerfile` and pushes to `ghcr.io/<owner>/ieee-fraud-serving` tagged
+  `sha-<short>` (this commit) + `latest` — CD only publishes what CI validated.
+- **`make contract`** — the feature-contract check: loads the committed seed
+  artifact and asserts it carries the exact production contract (218 features /
+  9 categoricals / threshold in (0,1)) and scores a contract-shaped row. Runs
+  locally too: `uv run make contract`.
+
 ## Running the demo
 
 ```bash
