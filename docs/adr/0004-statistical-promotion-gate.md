@@ -1,0 +1,3 @@
+# Statistical promotion gate (DeLong / paired bootstrap)
+
+The champion-vs-challenger promotion decision uses a statistical significance test on the shared test set — a paired comparison (DeLong test or paired bootstrap) — rather than a fixed AUC margin. A challenger is promoted to Production only if it is significantly better, and it is always evaluated on the same test set as the champion. Chosen over a fixed margin (e.g. +0.001–0.005) because at this val scale fixed margins sit inside fold-to-fold noise and would auto-promote junk. Consequence: promotion is more conservative and slightly more code, but each promotion is defensible and the demo shows rigor rather than a magic number.

@@ -1,0 +1,3 @@
+# 70/15/15 temporal split with a label-free production stream
+
+Data is split chronologically 70% train / 15% test / 15% production stream. The test set is used only for offline evaluation (operating threshold selection and champion-vs-challenger comparison). The production stream is held out, its labels stripped, and replayed to the serving stack to simulate live traffic and drive drift monitoring; labels are revealed later only when the retraining corpus is assembled. This replaces the earlier DVC-as-new-data-signal idea and the old 80/20 split. Consequence: the champion's 0.9210 (measured on 80/20) is re-baselined on the new split; the ~88k-row stream requires accelerated replay and must never touch train/test/threshold selection.

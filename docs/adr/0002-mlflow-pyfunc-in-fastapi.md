@@ -1,0 +1,3 @@
+# Serve via MLflow pyfunc in FastAPI
+
+One model artifact serves both the real-time API and the batch scorer: `train.py` logs the model via `mlflow.lightgbm.log_model` (pyfunc flavor), wrapping the full 218-feature transform and the LightGBM booster; FastAPI and the batch CLI load the same pyfunc. Rejected: a raw LightGBM booster with a hand-rolled transform wrapper (duplicates the transform and risks train/serve drift) and a plain sklearn joblib (no registry lineage). Consequence: MLflow becomes the single artifact source of truth, and the feature contract is enforced inside the pyfunc wrapper.
