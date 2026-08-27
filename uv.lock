@@ -1237,6 +1237,8 @@ source = { editable = "." }
 dependencies = [
     { name = "catboost" },
     { name = "dvc" },
+    { name = "fastapi" },
+    { name = "httpx" },
     { name = "ipython" },
     { name = "jupyterlab" },
     { name = "lightgbm" },
@@ -1256,6 +1258,7 @@ dependencies = [
     { name = "seaborn" },
     { name = "tqdm" },
     { name = "typer" },
+    { name = "uvicorn" },
     { name = "xgboost" },
 ]
 
@@ -1263,6 +1266,8 @@ dependencies = [
 requires-dist = [
     { name = "catboost", specifier = ">=1.2.10" },
     { name = "dvc", specifier = ">=3.67.1" },
+    { name = "fastapi" },
+    { name = "httpx" },
     { name = "ipython" },
     { name = "jupyterlab" },
     { name = "lightgbm", specifier = ">=4.7.0" },
@@ -1282,6 +1287,7 @@ requires-dist = [
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "tqdm" },
     { name = "typer" },
+    { name = "uvicorn" },
     { name = "xgboost", specifier = ">=3.4.1" },
 ]
 

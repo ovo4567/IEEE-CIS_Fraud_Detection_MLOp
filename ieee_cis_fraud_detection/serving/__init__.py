@@ -5,6 +5,7 @@ scoring module, which enforces the 218-column feature contract, loads the
 MLflow ``pyfunc`` model, and applies the operating threshold (ADR-0002).
 """
 
+from ieee_cis_fraud_detection.serving.api import create_app
 from ieee_cis_fraud_detection.serving.scoring import (
     ContractError,
     ModelContract,
@@ -12,4 +13,10 @@ from ieee_cis_fraud_detection.serving.scoring import (
     load_model,
 )
 
-__all__ = ["ContractError", "ModelContract", "ScoringBoundary", "load_model"]
+__all__ = [
+    "ContractError",
+    "ModelContract",
+    "ScoringBoundary",
+    "create_app",
+    "load_model",
+]
