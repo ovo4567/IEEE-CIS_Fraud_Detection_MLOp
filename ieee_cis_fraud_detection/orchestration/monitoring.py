@@ -140,6 +140,14 @@ def simulator_flow(
         transaction = pd.read_parquet(features_path)
     _train, _test, stream = temporal_split_70_15_15(transaction)
     payload = stream.drop(columns=[c for c in NON_FEATURE_COLUMNS if c in stream.columns])
+    # The real-time API enforces the strict no-NaN contract (ticket 03), so the
+    # simulator replays only contract-valid (fully populated) transactions for
+    # live scoring; NaN-bearing rows (which the NaN-native model would still
+    # score internally) are skipped rather than failing the demo with 400s.
+    n_skipped = int(payload.isna().any(axis=1).sum())
+    payload = payload.dropna()
+    if n_skipped:
+        logger.info(f"Simulator skipping {n_skipped} stream rows with NaN (API contract)")
     if max_transactions is not None:
         payload = payload.head(max_transactions)
 
@@ -207,16 +215,21 @@ def monitoring_flow(
     6. When the alarm fires and ``trigger_retraining`` is set, feed the
        retraining trigger (``retraining_flow(drift_alarm=True)``).
 
-    ``boundary`` defaults to the served champion (``load_model()``); tests
-    inject a hermetic stub. Returns a :class:`MonitoringOutcome`. When no
-    transactions have been scored yet the pass reports no drift (no alarm) and
-    skips the report.
+    ``boundary`` defaults to the served champion scored on its NATIVE input
+    space (``load_model(require_complete=False)``, so NaN-bearing stream rows
+    are scored rather than rejected); tests inject a hermetic stub. Returns a
+    :class:`MonitoringOutcome`. When no transactions have been scored yet the
+    pass reports no drift (no alarm) and skips the report.
     """
     if transaction is None:
         logger.info(f"Reading transactions from {features_path}")
         transaction = pd.read_parquet(features_path)
     if boundary is None:
-        boundary = load_model()
+        # Score the model's NATIVE input space (NaN-native LightGBM champion,
+        # ADR-0002): the drift window must reflect the real production stream,
+        # not an imputed stand-in. The strict no-NaN contract (ticket 03) stays
+        # the external serving surfaces' rule (API + batch CLI).
+        boundary = load_model(require_complete=False)
     train_df, _test, stream = temporal_split_70_15_15(transaction)
     feature_columns = boundary.feature_columns
 

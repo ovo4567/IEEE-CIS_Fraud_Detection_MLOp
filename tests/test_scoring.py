@@ -70,6 +70,29 @@ def test_nan_in_categorical_column_rejected() -> None:
         boundary.score(frame)
 
 
+def test_require_complete_false_scores_nan_native_rows() -> None:
+    """The internal (monitoring) path scores the model's NaN-native input space.
+
+    The champion is NaN-native LightGBM (trained on NaN-heavy data), so the
+    drift-monitoring flow scores the real production stream with ``NaN`` intact
+    (require_complete=False) — the strict no-NaN contract stays the external
+    serving surfaces' rule (ticket 03). Missing/extra/dtype checks still apply.
+    """
+    boundary = make_boundary(require_complete=False)
+    frame = make_frame()
+    frame.loc[0, "amount"] = np.nan
+    frame.loc[1, "cat_a"] = np.nan  # categorical NaN is native too
+    out = boundary.score(frame)  # must NOT raise
+    assert len(out) == 2
+
+
+def test_require_complete_false_still_rejects_missing_columns() -> None:
+    boundary = make_boundary(require_complete=False)
+    frame = make_frame().drop(columns=["cat_b"])
+    with pytest.raises(ContractError, match="missing.*cat_b"):
+        boundary.score(frame)
+
+
 def test_non_dataframe_rejected() -> None:
     boundary = make_boundary()
     with pytest.raises(ContractError, match="DataFrame"):

@@ -36,11 +36,13 @@ def make_contract() -> ModelContract:
     )
 
 
-def make_boundary(score_fn=None) -> ScoringBoundary:
+def make_boundary(score_fn=None, *, require_complete: bool = True) -> ScoringBoundary:
     """A hermetic boundary under the tiny contract, so no model is loaded."""
     if score_fn is None:
         score_fn = lambda frame: pd.Series(0.42, index=frame.index)
-    return ScoringBoundary(score_fn=score_fn, contract=make_contract())
+    return ScoringBoundary(
+        score_fn=score_fn, contract=make_contract(), require_complete=require_complete
+    )
 
 
 def make_frame(n: int = 2) -> pd.DataFrame:

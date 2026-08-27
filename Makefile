@@ -93,6 +93,39 @@ monitor:
 
 
 #################################################################################
+# DEMO (ticket 09): the self-contained Docker Compose stack (ADR-0001)         #
+#################################################################################
+
+## Bring up the self-contained demo stack (MLflow, API, Prefect, worker) from the committed seed, offline
+.PHONY: demo
+demo:
+	@docker info >/dev/null 2>&1 || { echo "ERROR: Docker is not running (start Docker Desktop first)"; exit 1; }
+	@test -f data/processed/train_transaction_filtered.parquet || { echo "ERROR: processed features missing — run 'dvc pull' (or 'make data') first"; exit 1; }
+	@test -f models/seed/mlflow.db || { echo "ERROR: committed seed missing — run 'make seed' first"; exit 1; }
+	docker compose -f deploy/compose.yaml up --build -d
+	@echo ""
+	@echo "Demo stack is up — no training, no cloud:"
+	@echo "  MLflow UI   http://localhost:5001   (champion v1 seeded from the committed artifact)"
+	@echo "  Prefect UI  http://localhost:4200   (scheduled simulator + monitoring deployments)"
+	@echo "  API         http://localhost:8000   (POST /predict)"
+	@echo ""
+	@echo "Watch live scoring + monitoring passes:  make demo-logs"
+	@echo "Stop the stack:                          make demo-down"
+
+
+## Tail the demo stack logs (live scoring + monitoring passes)
+.PHONY: demo-logs
+demo-logs:
+	docker compose -f deploy/compose.yaml logs -f --tail=100
+
+
+## Stop the demo stack
+.PHONY: demo-down
+demo-down:
+	docker compose -f deploy/compose.yaml down
+
+
+#################################################################################
 # Self Documenting Commands                                                     #
 #################################################################################
 

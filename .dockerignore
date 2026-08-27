@@ -1,0 +1,42 @@
+# Docker build context (repo root, see deploy/compose.yaml build.context).
+# Keep the build context small and keep runtime data OUT of the image: the
+# committed seed model and the processed data are mounted at runtime, never
+# baked in.
+
+# Version control
+.git
+.gitignore
+
+# Local virtualenv / tool caches
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.hypothesis
+
+# Data — mounted read-only into the worker at runtime (no in-container pull)
+data
+
+# Models — mounted via the seeded named volume at runtime
+models
+
+# Legacy MLflow notebook store + notebooks (dev only)
+mlruns
+notebooks
+
+# Generated reports / docs build output
+reports
+docs/site
+
+# Agents / scratch
+.agents
+.scratch
+skills-lock.json
+
+# Misc
+.DS_Store
+*.ipynb
+*.log

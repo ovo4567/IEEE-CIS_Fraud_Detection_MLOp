@@ -85,6 +85,13 @@ class ScoringBoundary:
     returns a DataFrame with a ``score``, a ``decision`` ("block"/"allow") and
     the shared ``threshold`` column per input row. Any contract violation
     raises :class:`ContractError` before scoring.
+
+    ``require_complete`` defaults to ``True`` — the strict external serving
+    contract (missing column, extra column, wrong dtype, or NaN all rejected,
+    ticket 03). Internal flows that score the model's *native* input space
+    (the NaN-native LightGBM champion, ADR-0002) pass ``require_complete=False``
+    so they can score the real, NaN-bearing production data — the drift
+    monitor scores the actual stream, not an imputed stand-in.
     """
 
     def __init__(
@@ -92,9 +99,11 @@ class ScoringBoundary:
         *,
         score_fn: Callable[[pd.DataFrame], pd.Series],
         contract: ModelContract,
+        require_complete: bool = True,
     ) -> None:
         self._score_fn = score_fn
         self.contract = contract
+        self.require_complete = require_complete
 
     @property
     def feature_columns(self) -> tuple[str, ...]:
@@ -158,7 +167,7 @@ class ScoringBoundary:
                     f"column {column!r} has dtype {dtype}; expected a numeric dtype"
                 )
         nan_columns = [c for c in self.feature_columns if frame[c].isna().any()]
-        if nan_columns:
+        if nan_columns and self.require_complete:
             raise ContractError(
                 f"NaN not allowed in the feature contract; found in columns: {nan_columns}"
             )
@@ -168,7 +177,9 @@ class ScoringBoundary:
         return apply_transform(frame, self.feature_columns, self.categorical_columns)
 
 
-def load_model(model_path: Path | None = None) -> ScoringBoundary:
+def load_model(
+    model_path: Path | None = None, *, require_complete: bool = True
+) -> ScoringBoundary:
     """Load the current champion pyfunc and wrap it as a :class:`ScoringBoundary`.
 
     With no explicit path, the served model (``models/serving/champion_model``
@@ -176,6 +187,9 @@ def load_model(model_path: Path | None = None) -> ScoringBoundary:
     not exist yet the committed seed artifact (``models/seed/champion_model``)
     is served instead, so serving surfaces call ``load_model()`` with no
     arguments and pick up a promoted model automatically.
+
+    ``require_complete`` is passed to the boundary (default strict); internal
+    flows that score the NaN-native stream pass ``require_complete=False``.
     """
     if model_path is None:
         model_path = SERVING_MODEL_PATH if SERVING_MODEL_PATH.exists() else SEED_MODEL_PATH
@@ -184,4 +198,5 @@ def load_model(model_path: Path | None = None) -> ScoringBoundary:
     return ScoringBoundary(
         score_fn=lambda frame: loaded.predict(frame)["score"],
         contract=contract,
+        require_complete=require_complete,
     )

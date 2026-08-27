@@ -1,6 +1,52 @@
-Getting started
-===============
+# Getting started
 
-This is where you describe how to get set up on a clean install, including the
-commands necessary to get the raw data (using the `sync_data_from_s3` command,
-for example), and then how to make the cleaned, final data sets.
+## Prerequisites
+
+- Python 3.12 and [uv](https://docs.astral.sh/uv/) (`uv sync` installs the
+  project and its dependencies).
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for the
+  self-contained demo stack, ticket 09 / ADR-0001).
+- The raw data via [DVC](https://dvc.org/): `dvc pull` (remote `storage` →
+  local DVC cache).
+
+## Set up the environment
+
+```bash
+uv sync                 # install dependencies into .venv
+dvc pull                # fetch the raw data (data/raw/*)
+make data               # (optional) regenerate processed features
+make seed               # (only if models/seed is absent — it is committed)
+make test               # run the test suite
+make lint               # ruff check + format check
+```
+
+## Run the self-contained demo stack (Docker Compose, offline)
+
+`make demo` brings up the whole MLOps stack from the committed seed — MLflow
+(seeded on a named volume), the real-time API, the Prefect orchestrator, and
+the worker that runs the stream simulator + drift-monitoring pass — with no
+training and no cloud:
+
+```bash
+make demo            # build + up (pre-flights Docker, data, seed), prints URLs
+make demo-logs       # tail the stack logs (live scoring + monitoring passes)
+make demo-down       # stop the stack
+```
+
+See `deploy/README.md` for the full walkthrough (services, URLs, tuning env
+vars, and how the named-volume seeding keeps it self-contained).
+
+## The closed loop, in one command each (no Docker)
+
+```bash
+make simulate    # replay the production stream through the real-time API
+make monitor     # one drift-monitoring pass (batch-score -> Evidently -> alarm)
+make retrain     # one retraining pass (trigger -> challenger -> promotion gate)
+```
+
+## Docs
+
+This project is documented with MkDocs (`mkdocs serve` from `docs/`), the
+design decisions live in `docs/adr/`, and the domain vocabulary in
+`CONTEXT.md`.
+

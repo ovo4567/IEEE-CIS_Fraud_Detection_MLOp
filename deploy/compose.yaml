@@ -1,0 +1,128 @@
+# Self-contained local Docker deployment of the MLOps stack (ADR-0001, ticket
+# 09). `make demo` (or `docker compose -f deploy/compose.yaml up`) brings up:
+#
+#   mlflow          MLflow tracking/registry server on a NAMED VOLUME, seeded on
+#                   first boot from the committed seed artifact (models/seed) —
+#                   no re-training, no cloud, no registry auth.
+#   prefect-server  Prefect server (UI + scheduling) on a named volume.
+#   api             The real-time FastAPI surface (POST /predict, port 8000).
+#   worker          A Prefect serve process that runs the scheduled flows:
+#                   the stream simulator (replays the production stream through
+#                   the API for the live demo) and the drift-monitoring pass
+#                   (batch scores the next chunk -> drift store -> Evidently
+#                   report -> alarm -> retraining trigger).
+#
+# All four run the same image (deploy/Dockerfile) with different entrypoints.
+# The model store is ONE named volume shared by mlflow, api, and worker, so a
+# promoted challenger (written by the worker) is what the API serves next, and
+# the MLflow UI shows the same registry the worker writes to.
+#
+# The training data is mounted READ-ONLY (./data -> /app/data) — no in-container
+# DVC pull — and only the runtime monitoring outputs (./data/monitoring) are
+# mounted read-write.
+
+name: ieee-fraud-demo
+
+x-demo-service: &demo-service
+  image: ieee-fraud-demo:local
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  restart: unless-stopped
+
+services:
+  mlflow:
+    <<: *demo-service
+    command: ["/app/deploy/scripts/entrypoint_mlflow.sh"]
+    environment:
+      # The registry the UI serves: the shared store's seeded champion DB.
+      MLFLOW_TRACKING_URI: sqlite:////app/models/seed/mlflow.db
+    volumes:
+      - mlflow_models:/app/models
+      # ../ relative to deploy/compose.yaml = the repo root's committed seed.
+      - ../models/seed:/seed-src:ro
+    # Host port 5001: macOS's AirPlay Receiver claims host 5000 on many Macs.
+    ports:
+      - "5001:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  prefect-server:
+    <<: *demo-service
+    command: ["prefect", "server", "start", "--host", "0.0.0.0"]
+    environment:
+      PREFECT_HOME: /prefect
+    volumes:
+      - prefect_data:/prefect
+    ports:
+      - "4200:4200"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4200/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  api:
+    <<: *demo-service
+    command:
+      [
+        "uvicorn",
+        "ieee_cis_fraud_detection.serving.api:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+      ]
+    volumes:
+      - mlflow_models:/app/models
+    ports:
+      - "8000:8000"
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/openapi.json"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  worker:
+    <<: *demo-service
+    command: ["/app/deploy/scripts/entrypoint_worker.sh"]
+    environment:
+      PREFECT_API_URL: http://prefect-server:4200/api
+      # The simulator replays the stream through the API at this address (the
+      # Compose service name behind DEFAULT_API_URL, ticket 08 handoff).
+      API_URL: http://api:8000
+      SIMULATOR_MAX_TRANSACTIONS: ${SIMULATOR_MAX_TRANSACTIONS:-300}
+      SIMULATOR_CADENCE_SECONDS: ${SIMULATOR_CADENCE_SECONDS:-0.2}
+      SIMULATOR_INTERVAL_SECONDS: ${SIMULATOR_INTERVAL_SECONDS:-600}
+      MONITOR_INTERVAL_SECONDS: ${MONITOR_INTERVAL_SECONDS:-60}
+      MONITOR_CHUNK_ROWS: ${MONITOR_CHUNK_ROWS:-200}
+      # The demo alarms on drift but does NOT auto-run the heavy retraining
+      # flow by default (turnkey); flip to true to enable drift -> retrain.
+      MONITOR_TRIGGER_RETRAINING: ${MONITOR_TRIGGER_RETRAINING:-false}
+    volumes:
+      # The shared model store (seeded + written by retraining).
+      - mlflow_models:/app/models
+      # Training data read-only (no in-container DVC pull); ../ = repo root.
+      - ../data:/app/data:ro
+      # ... with only the runtime monitoring outputs writable.
+      - ../data/monitoring:/app/data/monitoring
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+
+volumes:
+  mlflow_models:
+  prefect_data:

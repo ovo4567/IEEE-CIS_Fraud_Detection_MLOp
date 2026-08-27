@@ -1,8 +1,8 @@
 # HANDOFF — IEEE-CIS Fraud Detection
 
-- **Last session:** 2026-08-27 (same day, new session) — **retraining flow (ticket 07) done**
-- **Next session:** 2026-08-27 — **ticket 08: stream simulator + drift monitoring (Evidently)** over the batch-scored drift window
-- **Git:** retraining flow committed (Prefect flow + stage transitions + served-model update); see "This session" below
+- **Last session:** 2026-08-27 (same day, new session) — **Docker Compose + make demo (ticket 09) done**
+- **Next session:** 2026-08-27 — **ticket 10: CI/CD (GitHub Actions)** over the committed seed + test suite
+- **Git:** ticket 09 committed (Compose stack + `make demo` + seed helper + NaN seam); see "This session" below
 
 ---
 
@@ -140,16 +140,51 @@ and publishes the promoted model to the served path.
   per `@flow` call and logs noisily at interpreter shutdown; `tests/conftest.py`
   sets `DO_NOT_TRACK=1` + `PREFECT_LOGGING_LEVEL=CRITICAL` to keep output clean.
 
+## ✅ This session — Docker Compose + make demo (ticket 09)
+
+The self-contained offline stack (ADR-0001). All four services run on one
+image (`ieee-fraud-demo:local`) so a fresh clone can demo with no training and
+no cloud:
+
+- **`deploy/compose.yaml`** (`name: ieee-fraud-demo`) — `mlflow` (seeded from the
+  committed artifact into the `mlflow_models` named volume, host port **5001**
+  — 5000 is held by macOS AirPlay), `prefect-server` (4200, `prefect_data`
+  volume), `api` (FastAPI, 8000, depends_on mlflow healthy), and `worker`
+  (Prefect: registers `stream-simulator` + `drift-monitoring`, triggers an
+  immediate run of each, `prefect.serve(*deployments, limit=1)` to serialize
+  flow runs; mounts `../data:/app/data:ro`).
+- **`deploy/Dockerfile`** — `python:3.12-slim`; build tools BEFORE pip
+  (statsmodels source build, transitive dep of evidently); pinned
+  `deploy/requirements.txt` (exact dev versions); `pip install -e` the
+  package; data/models NOT baked in (mounted at runtime, root `.dockerignore`).
+- **`ieee_cis_fraud_detection/deployment/seed.py`** — idempotent MLflow store
+  seeder (copies committed `models/seed/` once, never clobbers a live
+  registry). Tests: `tests/test_deploy_seed.py`.
+- **NaN seam (ticket 03 stays intact)**: the stream is ~81.5% NaN-bearing but
+  the external API/batch enforce a strict no-NaN contract. Added
+  `require_complete: bool = True` to `ScoringBoundary`/`load_model()`;
+  monitoring scores the model's NaN-native space with
+  `load_model(require_complete=False)`, and the simulator drops NaN rows
+  before POSTing. API/batch contract unchanged.
+- **Memory**: each flow run reads the full 590k-row frame (~2.8–7 GB) →
+  `limit=1` serialization + Docker Desktop **≥ 12 GB** (VM bumped to 12.5 GB
+  here). Auto-retraining is OFF by default (`MONITOR_TRIGGER_RETRAINING`)
+  — the demo alarms on drift but retraining is on demand (Prefect UI /
+  `make retrain`). Verified fresh-clone: 0 OOM, 0 auto retrain, drift alarm
+  fires every pass, 10.8 MB report generated.
+- **Docs**: `deploy/README.md` + rewritten `docs/docs/getting-started.md`.
+- Tests: +5 new (3 seed + 2 `require_complete`); full suite 138 passing; ruff
+  clean. **Verified end-to-end on a fresh clone** (empty volumes + cleared
+  monitoring store): all 4 services healthy, MLflow seeded, simulator `200 OK`,
+  drift store 800+ rows, report + alarm, 0 OOM / 0 retrain.
+
 ## Plan for next session — DEPLOYMENT (next ticket)
 
-1. **08: Stream simulator + drift monitoring (Evidently)** — replay the
-   production stream through the API at accelerated cadence, accumulate a
-   time-sliced drift window from batch scoring, Evidently reports vs the
-   training reference, and the aggregate drift alarm feeding the retraining
-   trigger (07).
-2. **09/10**: Docker Compose + `make demo` (seed the in-stack MLflow from the
-   committed `models/seed/`), CI/CD.
-3. Later (v2): identity feature engineering, time features, aggregations,
+1. **10: CI/CD (GitHub Actions)** — lint + full test suite on push/PR, image
+   build, and (optionally) a smoke `make demo`;
+   consider `.github/workflows/ci.yml` with `uv` + `docker compose config`
+   checks. Ticket 09 stack is the reference target.
+2. Later (v2): identity feature engineering, time features, aggregations,
    calibration, neural net.
 
 ---
@@ -164,6 +199,9 @@ dvc pull                     # pull raw data from remote
 mlflow ui                    # open MLflow UI (store: mlruns/mlflow.db)
 make lint / make format      # ruff
 make retrain                 # run the retraining flow once
+make demo                    # bring up the whole Docker stack (ticket 09)
+make demo-logs               # tail all service logs
+make demo-down               # tear down the stack
 ```
 
 ## Environment / gotchas
@@ -182,3 +220,11 @@ make retrain                 # run the retraining flow once
   sets `PREFECT_LOGGING_LEVEL=CRITICAL`. The retraining flow registers the
   challenger in the clean registry via `MlflowClient.transition_model_version_stage`
   (deprecated in MLflow 2.9+, still the ticket's requested stage mechanism).
+- **Docker Compose demo (ticket 09)**: needs Docker Desktop with **≥ 12 GB**
+  memory (Settings → Resources). `docker compose` resolves relative bind mounts
+  against the compose file's dir (`deploy/`), so they must be `../data`,
+  `../models/seed`. Host port 5001 (not 5000) for MLflow. Auto-retraining off
+  by default (`MONITOR_TRIGGER_RETRAINING=false`) — flip to `true` for the
+  full drift→retrain loop. Prefect 3.8.4: `flow.to_deployment(...)` + REST
+  `create_flow_run` (async `PrefectClient` confuses Pylance); health path
+  `/api/health`. `prefect.serve(..., limit=1)` serializes the heavy flow runs.

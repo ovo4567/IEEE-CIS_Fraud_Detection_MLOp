@@ -1,0 +1,26 @@
+# Runtime dependencies for the self-contained demo stack (ticket 09).
+# A curated subset of pyproject.toml: everything the API, batch scorer,
+# Prefect flows (simulator / monitoring / retraining), and drift monitor
+# import at runtime — no notebooks, docs, or dev tooling.
+#
+# Pinned to the exact versions proven together in the repo's .venv so the
+# image build is deterministic and matches the tested local environment.
+
+mlflow==3.15.2
+lightgbm==4.7.0
+pandas==2.3.3
+numpy==2.5.2
+scikit-learn==1.9.0
+scipy==1.18.1
+pyarrow==25.0.1
+
+fastapi==0.141.1
+uvicorn==0.52.4
+httpx==0.28.1
+typer==0.27.1
+loguru==0.7.3
+python-dotenv==1.2.3
+
+prefect==3.8.4
+evidently==0.7.21
+statsmodels==0.15.0
