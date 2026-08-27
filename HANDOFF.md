@@ -1,8 +1,8 @@
 # HANDOFF — IEEE-CIS Fraud Detection
 
-- **Last session:** 2026-08-27 (same day, new session) — **seed champion pipeline (ticket 02) done**
-- **Next session:** 2026-08-27 — **ticket 03: scoring & decision boundary (Seam 1)** over the committed seed pyfunc
-- **Git:** seed champion committed (`models/seed/` registry + pyfunc); see "This session" below
+- **Last session:** 2026-08-27 (same day, new session) — **retraining flow (ticket 07) done**
+- **Next session:** 2026-08-27 — **ticket 08: stream simulator + drift monitoring (Evidently)** over the batch-scored drift window
+- **Git:** retraining flow committed (Prefect flow + stage transitions + served-model update); see "This session" below
 
 ---
 
@@ -96,18 +96,60 @@ Deployed the fine-tuned LightGBM as the **committed seed champion**:
   `make lint` green. ADR-0002 amended (mechanism is `mlflow.pyfunc.save_model`
   with an embedded booster, not `mlflow.lightgbm.log_model`).
 
+## ✅ This session — retraining flow (ticket 07)
+
+The retraining half of the closed loop, as a **Prefect flow**: on a trigger
+(drift alarm OR accumulated scored volume since the last retrain, default
+~5,000, configurable) it builds the retraining corpus (history + revealed
+scored stream per the 7-day reveal lag), trains a challenger on a fresh
+70/15/15 re-split, scores it against the champion on the shared test set,
+applies the DeLong promotion gate (ADR-0004), transitions the registry stage,
+and publishes the promoted model to the served path.
+
+- `ieee_cis_fraud_detection/orchestration/retraining.py` — `retraining_flow`
+  (Prefect `@flow`) plus the pure, callable steps: `should_retrain` (trigger
+  rule), `accumulated_volume_since_last_retrain` (drift-store rows since the
+  last retrain, checkpointed in `data/monitoring/retrain_state.json`),
+  `scored_transaction_ids`, `prepare_retraining_inputs` (corpus vs shared
+  test), `train_challenger`, `register_challenger` (next version + stage
+  transition + serve on promotion), `publish_served_model`. CLI:
+  `make retrain` / `python -m ieee_cis_fraud_detection.orchestration.retraining`.
+- **Challenger = next registry version** under `ieee-fraud-champion`; promoted
+  challenger → `Production` (previous versions archived), non-promoted stays
+  `Staging`. Logs `val_auc`, `auc_champion`, `auc_challenger`, `promotion_pvalue`.
+- **Served model picks up the update**: promotion writes the pyfunc to
+  `models/serving/champion_model` (gitignored runtime dir);
+  `serving/scoring.load_model()` now prefers the served path over the
+  committed seed when present — the API/batch scorer pick up a promotion with
+  no redeploy.
+- **DeLong gate verified on synthetic data**: a stump champion (1 tree,
+  `num_leaves=2`) vs a 40-tree forest on a band pattern promotes reliably
+  (AUC 0.63–0.76 → 0.86–0.91, p < 0.007 across seeds).
+- **Deps**: added `prefect>=3.8.4`. Tests: 22 new (trigger / volume / corpus /
+  challenger / stage transitions / served-model resolution / flow end-to-end),
+  full suite 104 passing.
+- **Review hardening**: each registered version keeps a version-unique artifact
+  (`challengers/v{N}`, audit trail intact across retrains); a promotion
+  archives the superseded champion + the seed's unstaged version but leaves
+  Staging challengers under review alone; republishing the served model
+  replaces the previous artifact.
+- **Known trade-off**: MLflow 3.x deprecates registry *stages* in favor of
+  aliases; the flow uses stages per the ticket + ADR-0004 vocabulary (works in
+  3.15, FutureWarning in tests). Migrating to aliases is a future cleanup.
+- **Prefect test gotcha**: Prefect 3.x spins up an ephemeral subprocess server
+  per `@flow` call and logs noisily at interpreter shutdown; `tests/conftest.py`
+  sets `DO_NOT_TRACK=1` + `PREFECT_LOGGING_LEVEL=CRITICAL` to keep output clean.
+
 ## Plan for next session — DEPLOYMENT (next ticket)
 
-1. **03: Scoring & decision boundary (Seam 1)** — the deep module both serving
-   surfaces share: load the seed pyfunc, enforce the 218-col contract with
-   precise errors (missing/extra column, wrong dtype, NaN), apply the
-   operating threshold, return `{score, decision, threshold}`.
-2. **04/05: Real-time API + batch scorer** — thin adapters over Seam 1.
-3. **06/07/08**: control-plane logic, retraining flow, stream simulator +
-   drift monitoring.
-4. **09/10**: Docker Compose + `make demo` (seed the in-stack MLflow from the
+1. **08: Stream simulator + drift monitoring (Evidently)** — replay the
+   production stream through the API at accelerated cadence, accumulate a
+   time-sliced drift window from batch scoring, Evidently reports vs the
+   training reference, and the aggregate drift alarm feeding the retraining
+   trigger (07).
+2. **09/10**: Docker Compose + `make demo` (seed the in-stack MLflow from the
    committed `models/seed/`), CI/CD.
-5. Later (v2): identity feature engineering, time features, aggregations,
+3. Later (v2): identity feature engineering, time features, aggregations,
    calibration, neural net.
 
 ---
@@ -121,6 +163,7 @@ uv add <pkg>                 # add a dependency
 dvc pull                     # pull raw data from remote
 mlflow ui                    # open MLflow UI (store: mlruns/mlflow.db)
 make lint / make format      # ruff
+make retrain                 # run the retraining flow once
 ```
 
 ## Environment / gotchas
@@ -134,3 +177,8 @@ make lint / make format      # ruff
 - **Parquet** preserves the `category` dtype; CSV does not — keep using parquet for processed features.
 - **Test inference**: raw `test_transaction.csv` has 393 cols → select exactly the 218 training feature columns and cast the 9 categorical cols to `category` dtype (see submission cells at the end of `Modeling.ipynb`). `data/` is gitignored → `data/submissions/` is local-only (fine for manual Kaggle upload).
 - **autolog side effect**: `mlflow.autolog()` is active in `Modeling.ipynb`, so every `model.fit()` there (incl. the submission cells) creates an extra autolog run — now WITH model artifacts. Harmless, but expect extra runs in MLflow.
+- **Prefect 3.x**: `@flow` calls spin up an ephemeral subprocess server (no
+  `PREFECT_API_URL` configured) — fine locally, but noisy in tests; conftest
+  sets `PREFECT_LOGGING_LEVEL=CRITICAL`. The retraining flow registers the
+  challenger in the clean registry via `MlflowClient.transition_model_version_stage`
+  (deprecated in MLflow 2.9+, still the ticket's requested stage mechanism).

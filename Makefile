@@ -74,6 +74,12 @@ seed:
 	$(PYTHON_INTERPRETER) -m ieee_cis_fraud_detection.modeling.train
 
 
+## Run the retraining flow once (trigger -> corpus -> challenger -> promotion gate)
+.PHONY: retrain
+retrain:
+	$(PYTHON_INTERPRETER) -m ieee_cis_fraud_detection.orchestration.retraining
+
+
 #################################################################################
 # Self Documenting Commands                                                     #
 #################################################################################

@@ -94,6 +94,9 @@ target/
 # MLflow
 mlruns/
 
+# Runtime promoted model (the committed seed under models/seed/ stays tracked)
+/models/serving/
+
 # CatBoost training artifacts
 notebooks/catboost_info/
 

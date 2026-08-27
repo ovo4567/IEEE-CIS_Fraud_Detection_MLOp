@@ -32,6 +32,18 @@ _Avoid_: cut-off, decision boundary
 The data a challenger is fit on: all historical training data plus the accumulated scored stream whose labels have been revealed.
 _Avoid_: training data, dataset
 
+**Retraining trigger**:
+The event that starts a retraining pass: accumulated scored volume since the last retrain (default ~5,000) OR a drift alarm.
+_Avoid_: retrain condition, retrain signal
+
+**Served model**:
+The model artifact serving surfaces actually load (`models/serving/champion_model`, published on promotion); falls back to the committed seed before the first promotion.
+_Avoid_: live model, production artifact
+
+**Registry stage**:
+The MLflow lifecycle stage of a model version (`Staging` for a challenger awaiting review, `Production` for the champion, `Archived` for superseded versions).
+_Avoid_: tag, status
+
 ## Serving
 
 **Feature contract**:

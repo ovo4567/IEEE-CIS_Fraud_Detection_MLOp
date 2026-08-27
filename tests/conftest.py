@@ -8,6 +8,17 @@ tiny contract is defined once here instead of being copy-pasted per module.
 
 from __future__ import annotations
 
+import os
+
+# The retraining-flow tests import Prefect, whose telemetry client prints a
+# banner and spawns background threads at interpreter shutdown. Opt out before
+# any test module imports it.
+os.environ.setdefault("DO_NOT_TRACK", "1")
+os.environ.setdefault("PREFECT_SERVER_ANALYTICS_ENABLED", "false")
+# Prefect 3.x starts an ephemeral subprocess server per flow call; keep its
+# lifecycle logs (and a known shutdown-order logging error) out of test output.
+os.environ.setdefault("PREFECT_LOGGING_LEVEL", "CRITICAL")
+
 import pandas as pd
 
 from ieee_cis_fraud_detection.serving.scoring import ModelContract, ScoringBoundary

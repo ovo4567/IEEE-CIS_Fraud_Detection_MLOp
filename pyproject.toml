@@ -31,6 +31,7 @@ dependencies = [
     "numpy",
     "pandas",
     "pip",
+    "prefect>=3.8.4",
     "pyarrow>=25.0.1",
     "pytest",
     "python-dotenv",

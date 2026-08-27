@@ -44,6 +44,17 @@ SEED_MODEL_PATH = SEED_REGISTRY_DIR / "champion_model"
 MONITORING_DIR = DATA_DIR / "monitoring"
 DRIFT_STORE_PATH = MONITORING_DIR / "current_window.csv"
 
+# --------------------------------------------------------------------------- #
+# Retraining flow + served model (ticket 07)
+# --------------------------------------------------------------------------- #
+
+# A promoted challenger is published here so the serving surfaces pick up the
+# update; it is runtime data (gitignored), distinct from the committed seed.
+SERVING_MODEL_PATH = MODELS_DIR / "serving" / "champion_model"
+
+# Retrain bookkeeping: the drift-store row count at the last retrain.
+RETRAIN_STATE_PATH = MONITORING_DIR / "retrain_state.json"
+
 
 def tracking_uri_for(db_dir: Path) -> str:
     """Local SQLite MLflow tracking URI for a registry directory."""

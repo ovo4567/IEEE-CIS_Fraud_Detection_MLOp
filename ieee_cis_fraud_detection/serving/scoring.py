@@ -22,7 +22,7 @@ import mlflow.pyfunc
 import numpy as np
 import pandas as pd
 
-from ieee_cis_fraud_detection.config import SEED_MODEL_PATH
+from ieee_cis_fraud_detection.config import SEED_MODEL_PATH, SERVING_MODEL_PATH
 from ieee_cis_fraud_detection.modeling.pyfunc import apply_transform
 
 
@@ -168,12 +168,17 @@ class ScoringBoundary:
         return apply_transform(frame, self.feature_columns, self.categorical_columns)
 
 
-def load_model(model_path: Path = SEED_MODEL_PATH) -> ScoringBoundary:
-    """Load the committed champion pyfunc and wrap it as a :class:`ScoringBoundary`.
+def load_model(model_path: Path | None = None) -> ScoringBoundary:
+    """Load the current champion pyfunc and wrap it as a :class:`ScoringBoundary`.
 
-    The default is the committed seed artifact (``models/seed/champion_model``),
-    so serving surfaces call ``load_model()`` with no arguments.
+    With no explicit path, the served model (``models/serving/champion_model``
+    — written by the retraining flow on promotion) is preferred; when it does
+    not exist yet the committed seed artifact (``models/seed/champion_model``)
+    is served instead, so serving surfaces call ``load_model()`` with no
+    arguments and pick up a promoted model automatically.
     """
+    if model_path is None:
+        model_path = SERVING_MODEL_PATH if SERVING_MODEL_PATH.exists() else SEED_MODEL_PATH
     loaded = mlflow.pyfunc.load_model(str(model_path))
     contract = ModelContract.from_python_model(loaded)
     return ScoringBoundary(
