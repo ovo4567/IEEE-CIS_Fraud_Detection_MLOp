@@ -1,4 +1,7 @@
-site_name: IEEE-CIS_Fraud_Detection
-# 
+site_name: IEEE-CIS Fraud Detection — MLOps
 site_author: Alex
-# 
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Portfolio: portfolio.md

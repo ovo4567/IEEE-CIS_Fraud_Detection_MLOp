@@ -14,7 +14,7 @@
 ```bash
 uv sync                 # install dependencies into .venv
 dvc pull                # fetch the raw data (data/raw/*)
-make data               # (optional) regenerate processed features
+.venv/bin/python -m ieee_cis_fraud_detection.features  # build processed features (only if data/processed is missing — gitignored)
 make seed               # (only if models/seed is absent — it is committed)
 make test               # run the test suite
 make lint               # ruff check + format check
