@@ -48,7 +48,7 @@ The dataset is obtained outside the repository and tracked with DVC. Raw data
 files are kept out of Git, while DVC pointer files make the data dependency
 reproducible.
 
-**Dataset source:** `TODO: add the dataset URL and access instructions`
+**Dataset source:** [`IEEE-CIS Fraud Detection`](https://www.kaggle.com/competitions/ieee-fraud-detection/overview)
 
 The current data represents online transactions and includes a binary
 `isFraud` target. The data contains class imbalance, missing values, and a
