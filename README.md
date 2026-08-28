@@ -1,179 +1,279 @@
-# IEEE-CIS Fraud Detection — an end-to-end MLOps deployment
+# IEEE-CIS Fraud Detection MLOps
 
-A portfolio-grade MLOps project that takes a strong fraud-detection model and
-runs the **full closed loop** around it: reproducible training → registry →
-serving (real-time API + batch) → drift monitoring → triggered retraining with
-a statistical promotion gate — all reproducible locally with Docker and wired
-to GitHub Actions CI/CD.
+A hands-on project for learning the complete machine-learning operations
+(MLOps) lifecycle.
 
-The model is a fine-tuned LightGBM on the
-[IEEE-CIS Fraud Detection](https://www.kaggle.com/competitions/ieee-fraud-detection)
-dataset (~590k transactions, 218 features, extreme class imbalance, MNAR
-missingness). One command — **`make demo`** — brings up the whole stack from a
-committed seed artifact: no training, no cloud, no registry auth.
+The goal of version 1 is not to find the perfect fraud-detection algorithm. It
+is to understand how a model moves from data to a maintained, monitored service.
+The current implementation uses LightGBM as the v1 model. Future versions can
+replace or compare the model algorithm without changing the surrounding MLOps
+workflow.
 
-## Highlights
+## Project status
 
-- **Reproducible seed model** — `make seed` re-fits the `finetuned_lgbm` recipe
-  on a chronological 70/15/15 split (ADR-0003) and commits a self-contained
-  MLflow `pyfunc` artifact (feature transform + booster + operating threshold).
-  **Test AUC 0.9286**, operating threshold **0.0551** (10:1 cost ratio).
-- **Strict feature contract** — the served model accepts exactly the 218
-  training columns (9 categoricals as `category`); missing/extra/wrong-dtype/NaN
-  payloads are rejected with a precise error (ticket 03).
-- **Two serving surfaces, one model** — a FastAPI `POST /predict` returning
-  `{score, decision, threshold}` and a batch CLI that scores CSVs and feeds the
-  drift monitor (tickets 04–05).
-- **Real monitoring** — an Evidently drift pass compares a recent scored window
-  to the training reference and alarms on feature *or* score drift (ticket 08).
-- **A real retraining loop** — a Prefect flow rebuilds the corpus (history +
-  revealed stream, 7-day reveal lag), trains a challenger, and promotes it only
-  when a **DeLong significance test** says it is genuinely better (ADR-0004).
-  A promoted model is served with no redeploy (ticket 07).
-- **Turnkey demo + real CI/CD** — `make demo` runs the whole stack offline from
-  the committed seed (ticket 09); GitHub Actions runs lint/contract/tests and
-  publishes the serving image to GHCR (ticket 10).
+| Item | Status |
+| --- | --- |
+| Project version | v1 |
+| Learning focus | End-to-end MLOps lifecycle |
+| Current model | LightGBM |
+| Deployment style | Local Docker Compose |
+| Future direction | Compare and improve ML algorithms |
 
-## Architecture
+## MLOps workflow
+
+This project demonstrates the following closed loop:
 
 ```mermaid
-flowchart TB
-    subgraph Build["Train (offline, reproducible)"]
-        Seed["make seed<br/>re-fit finetuned_lgbm on 70/15/15<br/>pyfunc + operating threshold"]
-    end
-
-    Stream["production stream<br/>(chronological last 15%, label-free)"]
-
-    subgraph Serve["Serve — Docker Compose · make demo (offline)"]
-        MLflow["MLflow registry<br/>(seeded, shared named volume)"]
-        API["FastAPI POST /predict<br/>→ {score, decision, threshold}"]
-        Sim["stream-simulator"]
-        Monitor["drift-monitoring<br/>batch-score → drift store → Evidently → alarm"]
-    end
-
-    subgraph Learn["Retrain (triggered / on demand)"]
-        Corpus["retraining corpus<br/>history + revealed stream"]
-        Challenger["challenger model"]
-        Gate["DeLong promotion gate"]
-    end
-
-    Seed -->|committed artifact| MLflow
-    MLflow -->|shared mlflow_models volume| API
-    Stream --> Sim
-    Sim -->|replays stream, live scoring| API
-    Stream -->|batch-scored chunks| Monitor
-    Monitor -->|drift alarm OR accumulated volume| Learn
-    Corpus --> Challenger --> Gate
-    Gate -->|promote → Production| MLflow
-    MLflow -->|next request serves the new champion, no redeploy| API
+flowchart LR
+    A[Data acquisition] --> B[Data versioning]
+    B --> C[Data preparation]
+    C --> D[Feature engineering]
+    D --> E[Model training]
+    E --> F[Evaluation]
+    F --> G[MLflow registry]
+    G --> H[Deployment]
+    H --> I[Real-time and batch scoring]
+    I --> J[Drift monitoring]
+    J --> K{Retraining trigger}
+    K -->|No| J
+    K -->|Yes| L[Train challenger]
+    L --> M[Promotion gate]
+    M -->|Promote| G
+    M -->|Reject| J
 ```
 
-**Reading the loop:** the production stream (the chronological last 15% of the
-data, label-free at serve time) feeds two paths. The stream simulator replays
-it through the API for **live scoring**; the drift-monitoring pass
-**batch-scores stream chunks** into the drift window and compares it to the
-training reference. When enough features drift or the score distribution
-shifts, monitoring raises an alarm. The retraining flow then folds the stream
-(labels revealed after a 7-day lag) into a larger corpus, trains a challenger,
-and — only if the DeLong test on the shared test set says it is significantly
-better — promotes it to `Production`, which the API serves on the next request.
+### 1. Data acquisition and versioning
 
-## Quickstart — `make demo`
+The dataset is obtained outside the repository and tracked with DVC. Raw data
+files are kept out of Git, while DVC pointer files make the data dependency
+reproducible.
 
-Prerequisites: Python 3.12 + [uv](https://docs.astral.sh/uv/), Docker Desktop
-(**≥ 12 GB memory**), the raw data via [DVC](https://dvc.org/) (`dvc pull`),
-and the processed features (gitignored — built once by `features.py`).
+**Dataset source:** `TODO: add the dataset URL and access instructions`
+
+The current data represents online transactions and includes a binary
+`isFraud` target. The data contains class imbalance, missing values, and a
+temporal ordering that is useful for simulating production traffic.
+
+### 2. Data preparation and feature engineering
+
+The source tables are joined and transformed into processed feature files.
+Feature preparation is kept separate from model serving so that the same
+transformation is used consistently during training and inference.
+
+The deployed model has a strict feature contract: exactly 218 input features,
+including 9 categorical features with the expected dtypes. Invalid payloads
+are rejected instead of being silently scored.
+
+### 3. Training and evaluation
+
+The current v1 model is a LightGBM classifier. The data is split chronologically
+into:
+
+- 70% training data
+- 15% test data
+- 15% production stream used to simulate unseen traffic
+
+MLflow records training runs, parameters, metrics, and model artifacts. The
+operating threshold is selected during evaluation and stored with the model.
+
+### 4. Model registration
+
+Models are packaged as MLflow `pyfunc` artifacts containing the feature
+transformation, model, and operating threshold.
+
+- **Champion**: the model currently served by the application.
+- **Challenger**: a newly retrained model waiting for evaluation.
+- **Promotion**: making a challenger the champion.
+
+This keeps the model registry, the served artifact, and the prediction
+interfaces aligned.
+
+### 5. Deployment and serving
+
+Docker Compose runs the local MLOps stack:
+
+- MLflow provides experiment tracking and the model registry.
+- FastAPI exposes the real-time prediction API.
+- Prefect provides workflow orchestration and scheduling.
+- A worker runs the stream simulator, monitoring, and retraining flows.
+
+The API and worker share the same model store. When a challenger is promoted,
+the API can serve the new champion without rebuilding or redeploying the
+application.
+
+The project supports two inference surfaces:
+
+- **Real-time scoring**: score one transaction with `POST /predict`.
+- **Batch scoring**: score a CSV and write results for monitoring.
+
+### 6. Monitoring
+
+The stream simulator replays the chronological production-stream slice through
+the API. The monitoring flow batch-scores unseen chunks, stores the results, and
+uses Evidently to compare the current window with the training reference.
+
+Monitoring produces HTML and JSON drift reports and raises an alarm when the
+configured drift rule is met.
+
+### 7. Retraining and promotion
+
+Retraining can be triggered by a drift alarm or by accumulated scored volume.
+The retraining flow:
+
+1. Collects historical data and transactions whose labels have been revealed.
+2. Builds a new retraining corpus.
+3. Trains a challenger model.
+4. Evaluates the challenger against the champion.
+5. Promotes the challenger only when the promotion gate is satisfied.
+
+The simulated reveal lag models the fact that production labels are often
+available after the original prediction, not at scoring time.
+
+### 8. CI/CD
+
+GitHub Actions validates every push and pull request with:
+
+1. Locked dependency installation.
+2. Ruff formatting and lint checks.
+3. The model feature-contract check.
+4. The pytest suite.
+5. Docker Compose configuration validation.
+
+After CI succeeds on the default branch, the serving image is built and
+published to GitHub Container Registry.
+
+## Technology stack
+
+| Area | Technologies |
+| --- | --- |
+| Language | Python 3.12 |
+| Dependency management | uv, `pyproject.toml`, `uv.lock` |
+| Data processing | pandas, NumPy, PyArrow |
+| Current ML algorithm | LightGBM |
+| Alternative ML libraries | scikit-learn, XGBoost, CatBoost |
+| Experiment tracking and registry | MLflow |
+| Data versioning | DVC |
+| Workflow orchestration | Prefect |
+| Real-time serving | FastAPI, Uvicorn |
+| Batch serving | Python CLI |
+| Drift monitoring | Evidently |
+| Containers | Docker, Docker Compose |
+| CI/CD | GitHub Actions, GitHub Container Registry |
+| Testing and quality | pytest, Ruff |
+| Exploration and visualization | JupyterLab, Matplotlib, Seaborn |
+
+## Quickstart
+
+### Prerequisites
+
+- Python 3.12
+- [uv](https://docs.astral.sh/uv/)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) with at
+  least 12 GB of memory allocated
+- Access to the dataset and its DVC remote
+
+### Install and prepare the project
 
 ```bash
-uv sync                                            # install deps into .venv
-dvc pull                                           # fetch the raw data (data/raw/*)
-.venv/bin/python -m ieee_cis_fraud_detection.features  # build data/processed features
-make demo                                          # bring up the stack from the committed seed
+uv sync
+dvc pull
+python -m ieee_cis_fraud_detection.features
 ```
 
-`make demo` pre-flights Docker, the processed features, and the committed seed,
-then starts four services on one image and prints their URLs:
+The feature-generation command creates the processed files under
+`data/processed/`. These generated files are intentionally not committed to
+Git.
 
-| Service | URL | What it runs |
-|---------|-----|--------------|
-| MLflow | http://localhost:5001 | registry seeded with champion v1 (no re-training) |
-| Prefect | http://localhost:4200 | schedules the simulator + monitoring deployments |
-| API | http://localhost:8000 | `POST /predict` → `{score, decision, threshold}` |
-| Worker | — | runs the stream simulator + drift-monitoring passes |
+### Start the complete local stack
 
 ```bash
-make demo-logs      # watch live scoring + monitoring passes
-make demo-down      # stop the stack
+make demo
 ```
 
-The drift report lands at `data/monitoring/reports/latest_drift_report.html`.
-The demo **alarms on drift but does not auto-retrain** (turnkey); trigger a
-retrain from the Prefect UI or `make retrain`, or set
-`MONITOR_TRIGGER_RETRAINING=true make demo`. Full walkthrough (services, env
-vars, memory): [`deploy/README.md`](deploy/README.md).
+The stack provides:
 
-## The closed loop, one command each (no Docker)
+| Service | URL | Purpose |
+| --- | --- | --- |
+| FastAPI | http://localhost:8000 | Real-time prediction API |
+| MLflow | http://localhost:5001 | Experiments and model registry |
+| Prefect | http://localhost:4200 | Flow scheduling and monitoring |
+| Worker | No public URL | Simulator, monitoring, and retraining flows |
+
+Useful commands:
 
 ```bash
-make simulate    # replay the production stream through the real-time API
-make monitor     # one drift-monitoring pass (batch-score → Evidently → alarm)
-make retrain     # one retraining pass (trigger → challenger → promotion gate)
+make demo-logs       # follow service logs
+make demo-down       # stop the Docker Compose stack
 ```
 
-## CI/CD
+## MLOps commands without Docker
 
-One GitHub Actions workflow (`.github/workflows/ci.yml`), two jobs:
+```bash
+make data            # prepare the dataset
+make seed            # create or refresh the v1 champion artifact
+make simulate        # replay the production stream through the API
+make monitor         # run one drift-monitoring pass
+make retrain         # run one retraining and promotion pass
+```
 
-- **`ci`** — every push/PR: `uv sync --frozen` → `make lint` → `make contract`
-  (the feature-contract check) → `make test` → `docker compose config --quiet`.
-- **`cd`** — `needs: ci`, default-branch pushes only: build the serving image
-  and push to `ghcr.io/<owner>/ieee-fraud-serving` tagged `sha-<short>` +
-  `latest`. GHCR is the *publish target, not the runtime* — `make demo` always
-  builds locally (ADR-0001).
+The demo alarms on drift but does not automatically retrain by default. To
+enable automatic drift-to-retraining behavior:
+
+```bash
+MONITOR_TRIGGER_RETRAINING=true make demo
+```
+
+## Quality checks
+
+```bash
+make lint            # Ruff format and lint checks
+make contract        # validate the model feature contract
+make test            # run the test suite
+```
+
+Tests are designed to be hermetic and run without a network connection or a
+fresh DVC pull when the committed seed artifact is available.
 
 ## Repository layout
 
-```
-├── ieee_cis_fraud_detection      # the package
-│   ├── modeling/                 # split, threshold, pyfunc, train (make seed)
-│   ├── serving/                  # api.py (FastAPI), batch.py (CLI), scoring.py
-│   ├── orchestration/            # control_plane, monitoring, retraining flows
-│   ├── monitoring/               # drift_monitor (Evidently), drift_store
-│   └── deployment/               # seed.py, contract_check.py
-├── deploy/                       # Docker Compose stack + Dockerfile (ADR-0001)
-│   ├── compose.yaml
-│   ├── Dockerfile
-│   ├── requirements.txt          # pinned runtime deps
-│   └── scripts/                  # container entrypoints + Prefect worker
-├── models/seed/                  # committed seed artifact (mlflow.db + pyfunc)
-├── docs/                         # MkDocs site; design decisions in docs/adr/
-├── notebooks/                    # EDA, Modeling, FineTuning (reference only)
-├── data/                         # DVC-tracked raw + gitignored processed features
-└── tests/                        # 151 hermetic tests (no network / no data pull)
+```text
+ieee_cis_fraud_detection/
+├── modeling/        # splitting, thresholds, training, and model packaging
+├── serving/         # FastAPI, batch scoring, and model loading
+├── monitoring/      # drift detection and monitoring storage
+├── orchestration/   # simulation, monitoring, and retraining flows
+└── deployment/      # model seeding and feature-contract checks
+
+data/                # DVC-tracked raw data and generated processed features
+models/seed/         # committed v1 MLflow champion artifact
+deploy/              # Dockerfile, Compose stack, and container scripts
+notebooks/            # exploratory analysis and modeling notebooks
+tests/                # automated tests
+docs/                 # project documentation and architecture decisions
+references/           # dataset and supporting references
 ```
 
-## Tests & quality gates
+## Version 1 limitations and future work
 
-- `make lint` — ruff (format + check)
-- `make contract` — the feature-contract check: loads the committed seed and
-  asserts it carries exactly the production contract (218 features / 9
-  categoricals / threshold in (0,1)) and scores a contract-shaped row
-- `make test` — 151 tests across serving, orchestration, monitoring, retraining,
-  deployment seeding, and the contract check — fast, hermetic, no network, no
-  DVC pull (they run on committed inputs only, same as CI)
+This project intentionally prioritizes understanding the MLOps lifecycle over
+production-scale infrastructure. Planned improvements include:
 
-## Design decisions & docs
+- Comparing LightGBM with XGBoost, CatBoost, and other algorithms.
+- Improving feature engineering and model calibration.
+- Adding richer experiment-comparison dashboards.
+- Adding production-grade metrics and observability.
+- Evaluating cloud deployment options.
+- Replacing the simulated stream and label reveal process with real data
+  integrations.
 
-Every significant decision is recorded as an ADR in `docs/adr/`:
+The algorithm is expected to evolve. The reusable part of the project is the
+workflow that makes each new model reproducible, testable, deployable,
+monitorable, and replaceable.
 
-- **ADR-0001** — local Docker only; GHCR is a publish target, not a runtime
-- **ADR-0002** — MLflow `pyfunc` carries the full transform + booster + threshold
-- **ADR-0003** — chronological 70/15/15 train / test / production-stream split
-- **ADR-0004** — statistical (DeLong) promotion gate
+## Related documentation
 
-Domain vocabulary lives in [`CONTEXT.md`](CONTEXT.md); the operator guide is in
-[`deploy/README.md`](deploy/README.md); the portfolio narrative is in
-[`docs/docs/portfolio.md`](docs/docs/portfolio.md); the live handoff state is in
-[`HANDOFF.md`](HANDOFF.md).
-
-
+- [`deploy/README.md`](deploy/README.md) - detailed Docker deployment guide
+- [`CONTEXT.md`](CONTEXT.md) - project vocabulary and lifecycle terminology
+- [`docs/`](docs/) - documentation and architecture decisions
+- [`references/data-description.md`](references/data-description.md) - current
+  data description
