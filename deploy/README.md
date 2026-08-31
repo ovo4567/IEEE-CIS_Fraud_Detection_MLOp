@@ -43,10 +43,10 @@ schedule). The batch CLI also remains available inside the image
 - **Offline.** Images build locally; no cloud service, no GHCR auth, and no
   in-container DVC pull (data is mounted read-only). "Offline" means the
   *running stack* needs no training and no cloud; the repo-standard one-time
-  data steps (`dvc pull` + `features.py`, which materializes
-  `data/processed/*.parquet`) remain the fresh-clone prerequisite, exactly as
-  they are for every other `make` target. The committed seed (`models/seed`,
-  already in git) means no re-training.
+  data step (`features.py`, which materializes `data/processed/*.parquet`
+  from the raw CSVs in `data/raw/`) remains the fresh-clone prerequisite,
+  exactly as it is for every other `make` target. The committed seed
+  (`models/seed`, already in git) means no re-training.
 
 ## CI/CD (ticket 10)
 
@@ -69,7 +69,8 @@ and runs locally. One workflow (`.github/workflows/ci.yml`) holds both jobs:
 
 ```bash
 # one-time prerequisites (repo standard): data + committed seed
-dvc pull
+# no DVC remote is configured — download from Kaggle and copy the two train
+# CSVs into data/raw/ first (see the root README → "Get the dataset")
 .venv/bin/python -m ieee_cis_fraud_detection.features  # build processed features (gitignored, only if data/processed is missing)
 make seed          # only if models/seed is absent (it is committed, so usually not needed)
 

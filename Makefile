@@ -68,10 +68,10 @@ create_environment:
 #################################################################################
 
 
-## Make dataset
+## Build the processed features from the raw CSVs in data/raw
 .PHONY: data
 data: requirements
-	$(PYTHON_INTERPRETER) ieee_cis_fraud_detection/dataset.py
+	$(PYTHON_INTERPRETER) -m ieee_cis_fraud_detection.features
 
 
 ## Seed the committed champion model (re-fit finetuned_lgbm on the 70/15/15 split, register champion v1)
@@ -106,7 +106,7 @@ monitor:
 .PHONY: demo
 demo:
 	@docker info >/dev/null 2>&1 || { echo "ERROR: Docker is not running (start Docker Desktop first)"; exit 1; }
-	@test -f data/processed/train_transaction_filtered.parquet || { echo "ERROR: processed features missing — run 'dvc pull' (or 'make data') first"; exit 1; }
+	@test -f data/processed/train_transaction_filtered.parquet || { echo "ERROR: processed features missing — copy the Kaggle CSVs into data/raw and run 'make data'"; exit 1; }
 	@test -f models/seed/mlflow.db || { echo "ERROR: committed seed missing — run 'make seed' first"; exit 1; }
 	docker compose -f deploy/compose.yaml up --build -d
 	@echo ""

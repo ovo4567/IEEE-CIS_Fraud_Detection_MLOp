@@ -1,13 +1,44 @@
 # IEEE-CIS Fraud Detection MLOps
 
-A hands-on project for learning the complete machine-learning operations
-(MLOps) lifecycle.
+> An end-to-end fraud-detection platform that demonstrates how a model moves
+> from training to deployment, monitoring, and controlled retraining.
+
+[![CI](https://github.com/ovo4567/IEEE-CIS_Fraud_Detection_MLOp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ovo4567/IEEE-CIS_Fraud_Detection_MLOp/actions/workflows/ci.yml)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Docker Compose](https://img.shields.io/badge/deployment-Docker%20Compose-2496ED?logo=docker&logoColor=white)](deploy/README.md)
+
+This is a hands-on project for learning the complete machine-learning
+operations (MLOps) lifecycle with LightGBM, MLflow, FastAPI, Prefect, Evidently,
+DVC, and Docker Compose.
 
 The goal of version 1 is not to find the perfect fraud-detection algorithm. It
 is to understand how a model moves from data to a maintained, monitored service.
 The current implementation uses LightGBM as the v1 model. Future versions can
 replace or compare the model algorithm without changing the surrounding MLOps
 workflow.
+
+## Run the demo
+
+The fastest way to see the project in action is to run the complete local stack:
+
+```bash
+# one-time data setup — download from Kaggle first (see Quickstart → "Get the dataset")
+python -m ieee_cis_fraud_detection.features
+make demo
+```
+
+Once the stack is running, open these interfaces:
+
+| Interface | URL | What to inspect |
+| --- | --- | --- |
+| FastAPI | http://localhost:8000/docs | Real-time scoring endpoint |
+| MLflow | http://localhost:5001 | Runs, artifacts, and model registry |
+| Prefect | http://localhost:4200 | Scheduled simulation and monitoring flows |
+
+> **Screenshot placeholder:** After running the demo, capture a screenshot of
+> the MLflow or Prefect dashboard. Save it as `docs/figures/demo-dashboard.png`,
+> then replace this note with:
+> `![MLflow and Prefect dashboards](docs/figures/demo-dashboard.png)`.
 
 ## Project status
 
@@ -47,6 +78,10 @@ flowchart LR
 The dataset is obtained outside the repository and tracked with DVC. Raw data
 files are kept out of Git, while DVC pointer files make the data dependency
 reproducible.
+
+> **No DVC remote:** this repository does not configure a DVC remote, so a
+> fresh clone cannot `dvc pull`. Download the raw CSVs from Kaggle and place
+> them in `data/raw/` instead — see Quickstart → "Get the dataset".
 
 **Dataset source:** [`IEEE-CIS Fraud Detection`](https://www.kaggle.com/competitions/ieee-fraud-detection/overview)
 
@@ -142,6 +177,14 @@ GitHub Actions validates every push and pull request with:
 After CI succeeds on the default branch, the serving image is built and
 published to GitHub Container Registry.
 
+## Engineering highlights
+
+- A strict 218-feature contract rejects invalid real-time payloads.
+- A chronological 70/15/15 split separates training, evaluation, and simulated production traffic.
+- MLflow keeps the registry and served champion model aligned through promotion.
+- Evidently reports feature and score drift in the simulated production stream.
+- Hermetic tests validate serving, monitoring, retraining, and deployment behavior.
+
 ## Technology stack
 
 | Area | Technologies |
@@ -170,13 +213,42 @@ published to GitHub Container Registry.
 - [uv](https://docs.astral.sh/uv/)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) with at
   least 12 GB of memory allocated
-- Access to the dataset and its DVC remote
+- The raw dataset from
+  [Kaggle](https://www.kaggle.com/competitions/ieee-fraud-detection/data) —
+  see "Get the dataset" below
+
+### Get the dataset (from Kaggle, no DVC remote)
+
+This repository tracks raw data with DVC but does **not** configure a DVC
+remote, so `dvc pull` is not available on a fresh clone. Get the data directly
+from Kaggle instead:
+
+1. Download the data from the
+   [IEEE-CIS Fraud Detection competition](https://www.kaggle.com/competitions/ieee-fraud-detection/data)
+   (a free Kaggle account is required).
+2. Unzip the download.
+3. Copy the two **training** tables into `data/raw/`:
+
+   ```bash
+   mkdir -p data/raw
+   cp path/to/train_transaction.csv data/raw/
+   cp path/to/train_identity.csv   data/raw/
+   ```
+
+   Only these two files are required by the pipeline. `test_transaction.csv`,
+   `test_identity.csv`, and `sample_submission.csv` are only used by the
+   exploration notebooks, so they can be skipped.
+4. Build the processed features:
+
+   ```bash
+   python -m ieee_cis_fraud_detection.features
+   ```
 
 ### Install and prepare the project
 
 ```bash
 uv sync
-dvc pull
+# get the dataset from Kaggle first — see "Get the dataset" above
 python -m ieee_cis_fraud_detection.features
 ```
 
@@ -184,7 +256,33 @@ The feature-generation command creates the processed files under
 `data/processed/`. These generated files are intentionally not committed to
 Git.
 
-### Start the complete local stack
+### Deploy locally with Docker Compose
+
+Make sure Docker Desktop is running and has at least 12 GB of memory allocated.
+Then prepare the data and start the complete local stack:
+
+```bash
+# one-time: get the dataset from Kaggle (see "Get the dataset" above), then:
+python -m ieee_cis_fraud_detection.features
+make demo
+```
+
+The committed seed model is used automatically, so a fresh deployment does not
+need to retrain a model. When the command completes, verify that the services
+are available by opening the FastAPI documentation at
+`http://localhost:8000/docs`. The other service interfaces are listed below.
+
+To watch the simulator and monitoring activity, or to stop the deployment:
+
+```bash
+make demo-logs
+make demo-down
+```
+
+For Docker Compose configuration, resource requirements, environment variables,
+and troubleshooting, see [`deploy/README.md`](deploy/README.md).
+
+### Local service URLs
 
 ```bash
 make demo
@@ -209,7 +307,7 @@ make demo-down       # stop the Docker Compose stack
 ## MLOps commands without Docker
 
 ```bash
-make data            # prepare the dataset
+make data            # build processed features from the raw CSVs in data/raw
 make seed            # create or refresh the v1 champion artifact
 make simulate        # replay the production stream through the API
 make monitor         # run one drift-monitoring pass
@@ -231,8 +329,8 @@ make contract        # validate the model feature contract
 make test            # run the test suite
 ```
 
-Tests are designed to be hermetic and run without a network connection or a
-fresh DVC pull when the committed seed artifact is available.
+Tests are designed to be hermetic and run without a network connection or the
+raw dataset when the committed seed artifact is available.
 
 ## Repository layout
 

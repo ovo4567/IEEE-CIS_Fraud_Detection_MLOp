@@ -115,7 +115,7 @@ shared registry the API reads from — **promotion needs no redeploy**.
 
 ```bash
 uv sync
-dvc pull
+# get the dataset from Kaggle first — copy the two train CSVs into data/raw/
 make contract   # does the committed seed still carry the exact contract?
 make test       # the full suite, offline
 make demo       # the whole stack from the committed seed

@@ -91,6 +91,9 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# v2 data exploration — notebooks are not version-controlled while exploring
+/notebooks/
+
 # MLflow
 mlruns/
 

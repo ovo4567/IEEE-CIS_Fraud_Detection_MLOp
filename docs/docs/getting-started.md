@@ -6,14 +6,18 @@
   project and its dependencies).
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for the
   self-contained demo stack, ticket 09 / ADR-0001).
-- The raw data via [DVC](https://dvc.org/): `dvc pull` (remote `storage` →
-  local DVC cache).
+- The raw data from
+  [Kaggle](https://www.kaggle.com/competitions/ieee-fraud-detection/data) —
+  no DVC remote is configured, so download the CSVs yourself and copy the two
+  training tables (`train_transaction.csv`, `train_identity.csv`) into
+  `data/raw/`.
 
 ## Set up the environment
 
 ```bash
 uv sync                 # install dependencies into .venv
-dvc pull                # fetch the raw data (data/raw/*)
+# get the dataset from Kaggle first — copy train_transaction.csv and
+# train_identity.csv into data/raw/ (no DVC remote is configured)
 .venv/bin/python -m ieee_cis_fraud_detection.features  # build processed features (only if data/processed is missing — gitignored)
 make seed               # (only if models/seed is absent — it is committed)
 make test               # run the test suite
