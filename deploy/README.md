@@ -70,7 +70,7 @@ and runs locally. One workflow (`.github/workflows/ci.yml`) holds both jobs:
 ```bash
 # one-time prerequisites (repo standard): data + committed seed
 # no DVC remote is configured — download from Kaggle and copy the two train
-# CSVs into data/raw/ first (see the root README → "Get the dataset")
+# CSVs into data/raw/ first (see the root README → Quickstart, step 2)
 .venv/bin/python -m ieee_cis_fraud_detection.features  # build processed features (gitignored, only if data/processed is missing)
 make seed          # only if models/seed is absent (it is committed, so usually not needed)
 

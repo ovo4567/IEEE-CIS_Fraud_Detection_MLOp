@@ -22,7 +22,7 @@ workflow.
 The fastest way to see the project in action is to run the complete local stack:
 
 ```bash
-# one-time data setup — download from Kaggle first (see Quickstart → "Get the dataset")
+# one-time data setup — download from Kaggle first (see Quickstart → Step 2)
 python -m ieee_cis_fraud_detection.features
 make demo
 ```
@@ -81,7 +81,7 @@ reproducible.
 
 > **No DVC remote:** this repository does not configure a DVC remote, so a
 > fresh clone cannot `dvc pull`. Download the raw CSVs from Kaggle and place
-> them in `data/raw/` instead — see Quickstart → "Get the dataset".
+> them in `data/raw/` instead — see Quickstart → Step 2.
 
 **Dataset source:** [`IEEE-CIS Fraud Detection`](https://www.kaggle.com/competitions/ieee-fraud-detection/overview)
 
@@ -207,17 +207,41 @@ published to GitHub Container Registry.
 
 ## Quickstart
 
-### Prerequisites
+Run the whole stack on a fresh clone in four steps. No training is required —
+the v1 champion model is already committed to the repo.
 
-- Python 3.12
-- [uv](https://docs.astral.sh/uv/)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) with at
-  least 12 GB of memory allocated
-- The raw dataset from
-  [Kaggle](https://www.kaggle.com/competitions/ieee-fraud-detection/data) —
-  see "Get the dataset" below
+```bash
+# 1. Install the project (requires Python 3.12 and uv)
+uv sync
 
-### Get the dataset (from Kaggle, no DVC remote)
+# 2. Get the dataset — download it from Kaggle, then copy the two training
+#    tables into data/raw/ (there is no DVC remote to pull from)
+mkdir -p data/raw
+cp path/to/train_transaction.csv data/raw/
+cp path/to/train_identity.csv   data/raw/
+
+# 3. Build the processed feature files from those CSVs
+python -m ieee_cis_fraud_detection.features
+
+# 4. Start the full MLOps stack (requires Docker Desktop, ≥ 12 GB memory)
+make demo
+```
+
+When the stack is up, open <http://localhost:8000/docs> and try `POST /predict`.
+Each step is explained below.
+
+### Step 1 — Install dependencies
+
+Prerequisites: Python 3.12 and [uv](https://docs.astral.sh/uv/).
+
+```bash
+uv sync
+```
+
+You will also need [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+with at least 12 GB of memory allocated (used in step 4).
+
+### Step 2 — Get the dataset (from Kaggle, no DVC remote)
 
 This repository tracks raw data with DVC but does **not** configure a DVC
 remote, so `dvc pull` is not available on a fresh clone. Get the data directly
@@ -235,42 +259,34 @@ from Kaggle instead:
    cp path/to/train_identity.csv   data/raw/
    ```
 
-   Only these two files are required by the pipeline. `test_transaction.csv`,
-   `test_identity.csv`, and `sample_submission.csv` are only used by the
-   exploration notebooks, so they can be skipped.
-4. Build the processed features:
+Only these two files are required by the pipeline. `test_transaction.csv`,
+`test_identity.csv`, and `sample_submission.csv` are only used by the
+exploration notebooks, so they can be skipped.
 
-   ```bash
-   python -m ieee_cis_fraud_detection.features
-   ```
-
-### Install and prepare the project
+### Step 3 — Build the processed features
 
 ```bash
-uv sync
-# get the dataset from Kaggle first — see "Get the dataset" above
 python -m ieee_cis_fraud_detection.features
 ```
 
-The feature-generation command creates the processed files under
-`data/processed/`. These generated files are intentionally not committed to
-Git.
+This reads the raw CSVs from step 2 and writes
+`data/processed/train_transaction_filtered.parquet` (and
+`train_identity_filtered.parquet`). These generated files are intentionally
+not committed to Git. The same command is available as `make data`.
 
-### Deploy locally with Docker Compose
+### Step 4 — Deploy locally with Docker Compose
 
-Make sure Docker Desktop is running and has at least 12 GB of memory allocated.
-Then prepare the data and start the complete local stack:
+Make sure Docker Desktop is running and has at least 12 GB of memory allocated,
+then start the complete local stack:
 
 ```bash
-# one-time: get the dataset from Kaggle (see "Get the dataset" above), then:
-python -m ieee_cis_fraud_detection.features
 make demo
 ```
 
 The committed seed model is used automatically, so a fresh deployment does not
 need to retrain a model. When the command completes, verify that the services
 are available by opening the FastAPI documentation at
-`http://localhost:8000/docs`. The other service interfaces are listed below.
+`http://localhost:8000/docs`.
 
 To watch the simulator and monitoring activity, or to stop the deployment:
 
