@@ -1,0 +1,10 @@
+# Windows Git (core.autocrlf=true, the default) rewrites text files to CRLF on
+# checkout. Shell scripts executed inside the Linux containers MUST stay LF: a
+# stray CR in the shebang ("#!/usr/bin/env sh\r") makes the container fail on
+# boot with `env: 'sh\r': No such file or directory`. These rules force LF
+# regardless of each machine's autocrlf setting.
+*.sh text eol=lf
+
+# The deploy entrypoints are also run inside the container; Python tolerates
+# CRLF, but keeping them LF avoids any ambiguity.
+deploy/scripts/*.py text eol=lf

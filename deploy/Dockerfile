@@ -34,7 +34,11 @@ RUN pip install --no-cache-dir --no-deps -e /app
 
 # Container entrypoints (seed MLflow store, Prefect worker, wait-for-http).
 COPY deploy/scripts /app/deploy/scripts
-RUN chmod +x /app/deploy/scripts/*.sh
+# Normalize line endings: a Windows checkout (core.autocrlf=true) can inject
+# CRLF into these scripts, which breaks the shebang (`env: 'sh\r': ...`). Strip
+# any trailing CR so the image works regardless of the host's line endings.
+RUN sed -i 's/\r$//' /app/deploy/scripts/*.sh /app/deploy/scripts/*.py \
+    && chmod +x /app/deploy/scripts/*.sh
 
 # Default: the real-time API (overridden per service in compose.yaml).
 CMD ["uvicorn", "ieee_cis_fraud_detection.serving.api:app", "--host", "0.0.0.0", "--port", "8000"]
