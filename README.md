@@ -13,20 +13,6 @@ the perfect algorithm — it is understanding how a model moves from data to a
 maintained, monitored service. The v1 model is LightGBM; future versions can
 swap the algorithm without touching the MLOps workflow.
 
-## Run the demo
-
-```bash
-python -m ieee_cis_fraud_detection.features   # one-time data setup (see Quickstart)
-python scripts/dev.py demo                    # any OS — macOS/Linux: make demo
-```
-
-When the stack is up, open <http://localhost:8000/docs> and try `POST /predict`.
-Service URLs are listed in [Quickstart](#quickstart).
-
-> **Screenshot placeholder:** after running the demo, capture a dashboard
-> screenshot, save it as `docs/figures/demo-dashboard.png`, and replace this
-> note with `![MLflow and Prefect dashboards](docs/figures/demo-dashboard.png)`.
-
 ## Project status
 
 | Item | Status |
@@ -186,10 +172,10 @@ mkdir -p data/raw
 cp path/to/train_transaction.csv path/to/train_identity.csv data/raw/
 
 # 3. Build the processed features
-python -m ieee_cis_fraud_detection.features
+uv run python -m ieee_cis_fraud_detection.features
 
 # 4. Start the stack
-python scripts/dev.py demo
+uv run python scripts/dev.py demo
 ```
 
 When the stack is up, open <http://localhost:8000/docs> and try `POST /predict`.
@@ -199,8 +185,8 @@ by the exploration notebooks. The committed seed model is used automatically,
 so a fresh deployment needs no training. To follow logs or stop the stack:
 
 ```bash
-python scripts/dev.py logs   # follow service logs (macOS/Linux: make demo-logs)
-python scripts/dev.py down   # stop the stack      (macOS/Linux: make demo-down)
+uv run python scripts/dev.py logs   # follow service logs (macOS/Linux: make demo-logs)
+uv run python scripts/dev.py down   # stop the stack      (macOS/Linux: make demo-down)
 ```
 
 For Docker Compose configuration, resource requirements, environment variables,
