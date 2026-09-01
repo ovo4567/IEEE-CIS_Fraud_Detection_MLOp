@@ -3,7 +3,8 @@
 Home of the self-contained local-Docker deployment of the MLOps stack
 (ADR-0001): the Compose file and container image for MLflow (seeded from the
 committed champion artifact), the real-time API, the batch scorer + monitoring
-(scheduled Prefect flows), and the Prefect orchestrator. `make demo` brings the
+(scheduled Prefect flows), and the Prefect orchestrator. `make demo` (or the
+portable `python scripts/dev.py demo` — see "Running the demo" below) brings the
 whole stack up from the committed seed, offline — no cloud, no registry auth,
 no re-training on a fresh clone.
 
@@ -84,6 +85,24 @@ make demo-logs
 make demo-down
 ```
 
+### Windows (no `make`)
+
+`make` is not native to Windows. Use the portable launcher `scripts/dev.py`
+instead — it runs the exact same `docker compose -f deploy/compose.yaml`
+commands, performs the same pre-flight checks (Docker running, processed
+features present, committed seed present), and prints the same URLs:
+
+```powershell
+# activate the venv first, or use the full path .venv\Scripts\python.exe
+.venv\Scripts\activate
+python scripts/dev.py demo     # == make demo
+python scripts/dev.py logs     # == make demo-logs
+python scripts/dev.py down     # == make demo-down
+```
+
+The Makefile's targets all delegate to this same script, so macOS/Linux `make`
+users and Windows users share one code path for every command.
+
 `make demo` pre-flights Docker, the processed features, and the committed seed,
 then `docker compose -f deploy/compose.yaml up --build -d` and prints the URLs:
 
@@ -100,16 +119,19 @@ The drift reports land in `data/monitoring/reports/latest_drift_report.html`
 current window against the training reference.
 
 Tune the demo via environment variables (e.g. `SIMULATOR_CADENCE_SECONDS=0.5
-make demo`): `SIMULATOR_MAX_TRANSACTIONS`, `SIMULATOR_CADENCE_SECONDS`,
-`SIMULATOR_INTERVAL_SECONDS`, `MONITOR_INTERVAL_SECONDS`, `MONITOR_CHUNK_ROWS`.
+make demo`, or on Windows PowerShell `$env:SIMULATOR_CADENCE_SECONDS="0.5";
+python scripts/dev.py demo`): `SIMULATOR_MAX_TRANSACTIONS`,
+`SIMULATOR_CADENCE_SECONDS`, `SIMULATOR_INTERVAL_SECONDS`,
+`MONITOR_INTERVAL_SECONDS`, `MONITOR_CHUNK_ROWS`.
 
 **Drift → retrain is off by default in the demo.** The monitoring pass scores,
 reports, and *alarms* on drift (the committed seed's train slice genuinely
 drifts from the production stream over time), but it does not auto-run the
 heavy retraining flow (re-reads the full data + fits a 539-tree LightGBM on
 ~413k rows). Trigger a retrain on demand from the Prefect UI or `make retrain`;
-set `MONITOR_TRIGGER_RETRAINING=true make demo` to enable the automatic
-drift→retrain loop.
+set `MONITOR_TRIGGER_RETRAINING=true make demo` (PowerShell:
+`$env:MONITOR_TRIGGER_RETRAINING="true"; python scripts/dev.py demo`) to enable
+the automatic drift→retrain loop.
 
 **Memory**: the flows replay/score the full 590k-row processed frame (a single
 monitoring pass peaks ~7 GB), so give Docker Desktop ≥ 12 GB of memory

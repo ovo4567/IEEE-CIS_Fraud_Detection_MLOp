@@ -7,38 +7,25 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Docker Compose](https://img.shields.io/badge/deployment-Docker%20Compose-2496ED?logo=docker&logoColor=white)](deploy/README.md)
 
-This is a hands-on project for learning the complete machine-learning
-operations (MLOps) lifecycle with LightGBM, MLflow, FastAPI, Prefect, Evidently,
-DVC, and Docker Compose.
-
-The goal of version 1 is not to find the perfect fraud-detection algorithm. It
-is to understand how a model moves from data to a maintained, monitored service.
-The current implementation uses LightGBM as the v1 model. Future versions can
-replace or compare the model algorithm without changing the surrounding MLOps
-workflow.
+A hands-on project for learning the complete MLOps lifecycle with LightGBM,
+MLflow, FastAPI, Prefect, Evidently, DVC, and Docker Compose. The goal is not
+the perfect algorithm — it is understanding how a model moves from data to a
+maintained, monitored service. The v1 model is LightGBM; future versions can
+swap the algorithm without touching the MLOps workflow.
 
 ## Run the demo
 
-The fastest way to see the project in action is to run the complete local stack:
-
 ```bash
-# one-time data setup — download from Kaggle first (see Quickstart → Step 2)
-python -m ieee_cis_fraud_detection.features
-make demo
+python -m ieee_cis_fraud_detection.features   # one-time data setup (see Quickstart)
+python scripts/dev.py demo                    # any OS — macOS/Linux: make demo
 ```
 
-Once the stack is running, open these interfaces:
+When the stack is up, open <http://localhost:8000/docs> and try `POST /predict`.
+Service URLs are listed in [Quickstart](#quickstart).
 
-| Interface | URL | What to inspect |
-| --- | --- | --- |
-| FastAPI | http://localhost:8000/docs | Real-time scoring endpoint |
-| MLflow | http://localhost:5001 | Runs, artifacts, and model registry |
-| Prefect | http://localhost:4200 | Scheduled simulation and monitoring flows |
-
-> **Screenshot placeholder:** After running the demo, capture a screenshot of
-> the MLflow or Prefect dashboard. Save it as `docs/figures/demo-dashboard.png`,
-> then replace this note with:
-> `![MLflow and Prefect dashboards](docs/figures/demo-dashboard.png)`.
+> **Screenshot placeholder:** after running the demo, capture a dashboard
+> screenshot, save it as `docs/figures/demo-dashboard.png`, and replace this
+> note with `![MLflow and Prefect dashboards](docs/figures/demo-dashboard.png)`.
 
 ## Project status
 
@@ -75,19 +62,16 @@ flowchart LR
 
 ### 1. Data acquisition and versioning
 
-The dataset is obtained outside the repository and tracked with DVC. Raw data
-files are kept out of Git, while DVC pointer files make the data dependency
-reproducible.
+The dataset is downloaded from Kaggle and tracked with DVC: raw files stay out
+of Git, while DVC pointer files make the data dependency reproducible.
 
-> **No DVC remote:** this repository does not configure a DVC remote, so a
-> fresh clone cannot `dvc pull`. Download the raw CSVs from Kaggle and place
-> them in `data/raw/` instead — see Quickstart → Step 2.
+> **No DVC remote:** a fresh clone cannot `dvc pull`. Download the raw CSVs
+> from Kaggle and place them in `data/raw/` (see Quickstart).
 
 **Dataset source:** [`IEEE-CIS Fraud Detection`](https://www.kaggle.com/competitions/ieee-fraud-detection/overview)
 
-The current data represents online transactions and includes a binary
-`isFraud` target. The data contains class imbalance, missing values, and a
-temporal ordering that is useful for simulating production traffic.
+The data contains a binary `isFraud` target, class imbalance, missing values,
+and a temporal ordering useful for simulating production traffic.
 
 ### 2. Data preparation and feature engineering
 
@@ -101,15 +85,10 @@ are rejected instead of being silently scored.
 
 ### 3. Training and evaluation
 
-The current v1 model is a LightGBM classifier. The data is split chronologically
-into:
-
-- 70% training data
-- 15% test data
-- 15% production stream used to simulate unseen traffic
-
-MLflow records training runs, parameters, metrics, and model artifacts. The
-operating threshold is selected during evaluation and stored with the model.
+The v1 model is a LightGBM classifier, trained on a chronological 70/15/15 split
+(training / test / simulated production stream). MLflow records runs, metrics,
+and artifacts; the operating threshold is selected during evaluation and stored
+with the model.
 
 ### 4. Model registration
 
@@ -125,44 +104,30 @@ interfaces aligned.
 
 ### 5. Deployment and serving
 
-Docker Compose runs the local MLOps stack:
+Docker Compose runs MLflow (tracking and registry), FastAPI (real-time
+prediction API), Prefect (orchestration), and a worker (simulator, monitoring,
+and retraining flows). The API and worker share the same model store, so a
+promoted challenger is served without rebuilding or redeploying.
 
-- MLflow provides experiment tracking and the model registry.
-- FastAPI exposes the real-time prediction API.
-- Prefect provides workflow orchestration and scheduling.
-- A worker runs the stream simulator, monitoring, and retraining flows.
-
-The API and worker share the same model store. When a challenger is promoted,
-the API can serve the new champion without rebuilding or redeploying the
-application.
-
-The project supports two inference surfaces:
+Two inference surfaces are supported:
 
 - **Real-time scoring**: score one transaction with `POST /predict`.
 - **Batch scoring**: score a CSV and write results for monitoring.
 
 ### 6. Monitoring
 
-The stream simulator replays the chronological production-stream slice through
-the API. The monitoring flow batch-scores unseen chunks, stores the results, and
-uses Evidently to compare the current window with the training reference.
-
-Monitoring produces HTML and JSON drift reports and raises an alarm when the
-configured drift rule is met.
+The simulator replays the production-stream slice through the API. The
+monitoring flow batch-scores unseen chunks and uses Evidently to compare the
+current window with the training reference, producing HTML and JSON drift
+reports and raising an alarm when the configured rule is met.
 
 ### 7. Retraining and promotion
 
-Retraining can be triggered by a drift alarm or by accumulated scored volume.
-The retraining flow:
-
-1. Collects historical data and transactions whose labels have been revealed.
-2. Builds a new retraining corpus.
-3. Trains a challenger model.
-4. Evaluates the challenger against the champion.
-5. Promotes the challenger only when the promotion gate is satisfied.
-
-The simulated reveal lag models the fact that production labels are often
-available after the original prediction, not at scoring time.
+Retraining is triggered by a drift alarm or accumulated scored volume. The flow
+collects labeled historical data, trains a challenger, evaluates it against the
+champion, and promotes it only when the promotion gate is satisfied. The
+simulated reveal lag models the fact that production labels arrive after the
+original prediction, not at scoring time.
 
 ### 8. CI/CD
 
@@ -207,104 +172,41 @@ published to GitHub Container Registry.
 
 ## Quickstart
 
-Run the whole stack on a fresh clone in four steps. No training is required —
-the v1 champion model is already committed to the repo.
+Prerequisites: Python 3.12, [uv](https://docs.astral.sh/uv/), and Docker Desktop
+with ≥ 12 GB of memory. No training or `make` is needed: the v1 champion model
+is committed, and every `make <name>` has a cross-platform equivalent
+`python scripts/dev.py <name>`.
 
 ```bash
-# 1. Install the project (requires Python 3.12 and uv)
+# 1. Install dependencies
 uv sync
 
-# 2. Get the dataset — download it from Kaggle, then copy the two training
-#    tables into data/raw/ (there is no DVC remote to pull from)
+# 2. Add the Kaggle training tables (no DVC remote to pull from)
 mkdir -p data/raw
-cp path/to/train_transaction.csv data/raw/
-cp path/to/train_identity.csv   data/raw/
+cp path/to/train_transaction.csv path/to/train_identity.csv data/raw/
 
-# 3. Build the processed feature files from those CSVs
+# 3. Build the processed features
 python -m ieee_cis_fraud_detection.features
 
-# 4. Start the full MLOps stack (requires Docker Desktop, ≥ 12 GB memory)
-make demo
+# 4. Start the stack
+python scripts/dev.py demo
 ```
 
 When the stack is up, open <http://localhost:8000/docs> and try `POST /predict`.
-Each step is explained below.
 
-### Step 1 — Install dependencies
-
-Prerequisites: Python 3.12 and [uv](https://docs.astral.sh/uv/).
-
-```bash
-uv sync
-```
-
-You will also need [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-with at least 12 GB of memory allocated (used in step 4).
-
-### Step 2 — Get the dataset (from Kaggle, no DVC remote)
-
-This repository tracks raw data with DVC but does **not** configure a DVC
-remote, so `dvc pull` is not available on a fresh clone. Get the data directly
-from Kaggle instead:
-
-1. Download the data from the
-   [IEEE-CIS Fraud Detection competition](https://www.kaggle.com/competitions/ieee-fraud-detection/data)
-   (a free Kaggle account is required).
-2. Unzip the download.
-3. Copy the two **training** tables into `data/raw/`:
-
-   ```bash
-   mkdir -p data/raw
-   cp path/to/train_transaction.csv data/raw/
-   cp path/to/train_identity.csv   data/raw/
-   ```
-
-Only these two files are required by the pipeline. `test_transaction.csv`,
-`test_identity.csv`, and `sample_submission.csv` are only used by the
-exploration notebooks, so they can be skipped.
-
-### Step 3 — Build the processed features
+Only the two **training** tables are required — the test tables are used only
+by the exploration notebooks. The committed seed model is used automatically,
+so a fresh deployment needs no training. To follow logs or stop the stack:
 
 ```bash
-python -m ieee_cis_fraud_detection.features
-```
-
-This reads the raw CSVs from step 2 and writes
-`data/processed/train_transaction_filtered.parquet` (and
-`train_identity_filtered.parquet`). These generated files are intentionally
-not committed to Git. The same command is available as `make data`.
-
-### Step 4 — Deploy locally with Docker Compose
-
-Make sure Docker Desktop is running and has at least 12 GB of memory allocated,
-then start the complete local stack:
-
-```bash
-make demo
-```
-
-The committed seed model is used automatically, so a fresh deployment does not
-need to retrain a model. When the command completes, verify that the services
-are available by opening the FastAPI documentation at
-`http://localhost:8000/docs`.
-
-To watch the simulator and monitoring activity, or to stop the deployment:
-
-```bash
-make demo-logs
-make demo-down
+python scripts/dev.py logs   # follow service logs (macOS/Linux: make demo-logs)
+python scripts/dev.py down   # stop the stack      (macOS/Linux: make demo-down)
 ```
 
 For Docker Compose configuration, resource requirements, environment variables,
 and troubleshooting, see [`deploy/README.md`](deploy/README.md).
 
-### Local service URLs
-
-```bash
-make demo
-```
-
-The stack provides:
+### Service URLs
 
 | Service | URL | Purpose |
 | --- | --- | --- |
@@ -313,14 +215,9 @@ The stack provides:
 | Prefect | http://localhost:4200 | Flow scheduling and monitoring |
 | Worker | No public URL | Simulator, monitoring, and retraining flows |
 
-Useful commands:
-
-```bash
-make demo-logs       # follow service logs
-make demo-down       # stop the Docker Compose stack
-```
-
 ## MLOps commands without Docker
+
+`make <name>` is equivalent to `python scripts/dev.py <name>` on any OS.
 
 ```bash
 make data            # build processed features from the raw CSVs in data/raw
@@ -334,7 +231,9 @@ The demo alarms on drift but does not automatically retrain by default. To
 enable automatic drift-to-retraining behavior:
 
 ```bash
-MONITOR_TRIGGER_RETRAINING=true make demo
+MONITOR_TRIGGER_RETRAINING=true make demo      # macOS/Linux
+# Windows (PowerShell):
+# $env:MONITOR_TRIGGER_RETRAINING="true"; python scripts/dev.py demo
 ```
 
 ## Quality checks
@@ -344,6 +243,8 @@ make lint            # Ruff format and lint checks
 make contract        # validate the model feature contract
 make test            # run the test suite
 ```
+
+These work without `make` too: `python scripts/dev.py lint | contract | test`.
 
 Tests are designed to be hermetic and run without a network connection or the
 raw dataset when the committed seed artifact is available.
@@ -361,10 +262,11 @@ ieee_cis_fraud_detection/
 data/                # DVC-tracked raw data and generated processed features
 models/seed/         # committed v1 MLflow champion artifact
 deploy/              # Dockerfile, Compose stack, and container scripts
-notebooks/            # exploratory analysis and modeling notebooks
-tests/                # automated tests
-docs/                 # project documentation and architecture decisions
-references/           # dataset and supporting references
+scripts/             # cross-platform task runner (python scripts/dev.py <name>)
+notebooks/           # exploratory analysis and modeling notebooks
+tests/               # automated tests
+docs/                # project documentation and architecture decisions
+references/          # dataset and supporting references
 ```
 
 ## Version 1 limitations and future work

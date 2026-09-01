@@ -46,6 +46,10 @@ make demo-logs       # tail the stack logs (live scoring + monitoring passes)
 make demo-down       # stop the stack
 ```
 
+> **Windows (no `make`):** use the portable launcher instead — it runs the same
+> commands and pre-flight checks: `python scripts/dev.py demo | logs | down`
+> (equivalent to `make demo` / `demo-logs` / `demo-down`).
+
 See `deploy/README.md` for the full walkthrough (services, URLs, tuning env
 vars, and how the named-volume seeding keeps it self-contained).
 

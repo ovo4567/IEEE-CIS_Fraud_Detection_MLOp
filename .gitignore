@@ -96,6 +96,8 @@ target/
 
 # MLflow
 mlruns/
+mlflow.db
+mlflow.db-journal
 
 # Runtime promoted model (the committed seed under models/seed/ stays tracked)
 /models/serving/
